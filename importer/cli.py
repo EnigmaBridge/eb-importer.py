@@ -119,6 +119,24 @@ class App(Cmd):
         print(self.format_data(res), '%04X' % sw)
         return self.return_code(0)
 
+    def do_list(self, line):
+        """List all shares"""
+        pass
+
+    def do_erase(self, line):
+        """Deletes all shares present"""
+        print(self.t.underline_red('! WARNING !'))
+        print('This is a destructive operation, all shares will be unrecoverably deleted from the token')
+        if not self.ask_proceed('Do you really want to remove all key shares? (y/n): ', support_non_interactive=True):
+            return self.return_code(1)
+
+        resp, sw = self.send_erase_shares()
+        if sw != 0x9000:
+            logger.error('Could not erase all shares, code: %04X' % sw)
+            return self.return_code(1)
+
+        print('All shares erased successfully')
+        return self.return_code(0)
 
     def add_share(self, idx):
         # Enter key share
