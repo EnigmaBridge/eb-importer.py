@@ -394,6 +394,7 @@ class App(Cmd):
 
             idx += clen
 
+        logs.sort()
         return logs
 
     def get_pubkey(self):

@@ -108,6 +108,12 @@ class Logs(object):
     def add(self, line):
         self.lines.append(line)
 
+    def sort(self):
+        """
+        Sorts log lines from the latest to the newest
+        """
+        self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
+
     def __repr__(self):
         return 'Logs{entries: %s, overflows: 0x%x, lines: %s, signature: %s}' \
                % (len(self.lines), self.overflows, self.lines, self.signature)
