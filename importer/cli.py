@@ -101,13 +101,8 @@ class App(Cmd):
         """
         test
         """
-        if not self.check_root() or not self.check_pid():
+        if self.bootstrap() != 0:
             return self.return_code(1)
-
-        # Pick card to use
-        self.select_card()
-        self.connect_card()
-        self.select_importcard()
 
         res, sw = self.transmit(toBytes('b631000026a900110011111111111111111111111111111111ad000f74657374206d6573736167653a2030'))
         print(format_data(res), '%04X' % sw)
@@ -125,6 +120,9 @@ class App(Cmd):
 
     def do_add(self, line):
         """Adds a new share to the card"""
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
         code, res, sw = self.add_share()
         if code == 0:
             print(self.t.green('New share added successfully!'))
@@ -575,6 +573,7 @@ class App(Cmd):
                             help='enables verbose mode')
         parser.add_argument('--force', dest='force', action='store_const', const=True, default=False,
                             help='forces some action (e.g., certificate renewal)')
+
         parser.add_argument('--email', dest='email', default=None,
                             help='email address to use instead of prompting for one')
 
