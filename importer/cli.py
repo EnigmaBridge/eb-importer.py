@@ -216,14 +216,7 @@ class App(Cmd):
 
         return 0, res, sw
 
-    def return_code(self, code=0):
-        self.last_result = code
-        return code
 
-    def cli_sleep(self, iter=5):
-        for lines in range(iter):
-            print('')
-            time.sleep(0.1)
 
     def connect_card(self):
         try:
@@ -319,6 +312,15 @@ class App(Cmd):
         self.card = available_readers[selected]
         print('\nGoing to use the card: %s' % self.card)
         return 0
+
+    def return_code(self, code=0):
+        self.last_result = code
+        return code
+
+    def cli_sleep(self, iter=5):
+        for lines in range(iter):
+            print('')
+            time.sleep(0.1)
 
     def ask_proceed_quit(self, question=None, support_non_interactive=False, non_interactive_return=PROCEED_YES, quit_enabled=True):
         """Ask if user wants to proceed"""
