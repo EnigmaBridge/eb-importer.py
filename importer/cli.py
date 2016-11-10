@@ -232,7 +232,9 @@ class App(Cmd):
 
     def select_importcard(self):
         resp, sw = self.select_applet([0x31, 0x32, 0x33, 0x34, 0x35, 0x36])
-        # TODO: check if success
+        if sw != 0x9000:
+            logger.error('Could not select import card applet. Error: %04X' % sw)
+            raise errors.InvalidResponse('Could not select import card applet. Error: %04X' % sw)
 
         return resp, sw
 
