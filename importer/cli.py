@@ -16,7 +16,7 @@ import base64
 import datetime
 from blessed import Terminal
 from core import Core
-from card_utils import KeyShareInfo, format_data, get_2bytes, get_key_types, get_key_type, get_continue_bytes
+from card_utils import *
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
@@ -104,6 +104,8 @@ class App(Cmd):
         if self.bootstrap() != 0:
             return self.return_code(1)
 
+        print self.get_pubkey()
+
         res, sw = self.transmit(toBytes('b631000026a900110011111111111111111111111111111111ad000f74657374206d6573736167653a2030'))
         print(format_data(res), '%04X' % sw)
 
@@ -175,11 +177,17 @@ class App(Cmd):
             return self.return_code(1)
 
         # Dump logs
-        resp, sw = self.get_logs()
-        # if sw != 0x9000:
-        #     logger.error('Could not erase all shares, code: %04X' % sw)
-        #     return self.return_code(1)
-        # print('All shares erased successfully')
+        logs = self.get_logs()
+        print('Log entries: %d' % len(logs.lines))
+        print('Overflows: %d' % logs.overflows)
+        print('Log lines:')
+
+        for msg in logs.lines:
+            if not msg.used:
+                continue
+            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
+                  % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+        
         return self.return_code(0)
 
     def bootstrap(self):
@@ -348,11 +356,55 @@ class App(Cmd):
 
     def get_logs(self, limit=None):
         res, sw = self.send_get_logs()
+        if sw != 0x9000:
+            logger.error('Could not get logs, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get logs, code: %04X' % sw)
 
-        # Process
-        print(format_data(res))
-        
+        logs = Logs()
 
+        # TLV parser
+        tlen = len(res)
+        tag, clen, idx = 0, 0, 0
+        while idx < tlen:
+            tag = res[idx]
+            clen = get_2bytes(res, idx+1)
+            idx += 3
+            cdata = res[idx: (idx + clen)]
+
+            if tag == 0xae:
+                # Log container
+                entries = get_2bytes(cdata)
+                logs.overflows = get_2bytes(cdata, 2)
+
+                # Store the whole container for signature verification
+                logs.container = cdata
+
+                # Extract each log line record
+                for entry_idx in range(0, entries):
+                    offset = 4 + entry_idx * 15
+                    cline = cdata[offset:offset+15]
+
+                    cur_log = LogLine()
+                    cur_log.parse_line(cline)
+                    logs.add(cur_log)
+
+            elif tag == 0xab:
+                # Signature
+                logs.signature = cdata
+
+            idx += clen
+
+        return logs
+
+    def get_pubkey(self):
+        res, sw = self.send_get_pubkey()
+        if sw != 0x9000:
+            logger.error('Could not get public key, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
+
+        pk = RSAPublicKey()
+        pk.parse(res)
+        return pk
 
     def connect_card(self):
         try:
@@ -397,6 +449,10 @@ class App(Cmd):
 
     def send_erase_shares(self):
         res, sw = self.transmit_long([0xb6, 0x33, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_get_pubkey(self):
+        res, sw = self.transmit_long([0xb6, 0xe1, 0x0, 0x0, 0x0])
         return res, sw
 
     def transmit_long(self, data, **kwargs):
