@@ -303,9 +303,6 @@ class App(Cmd):
             logger.error('Could not get key shares info, code: %04X' % sw)
             raise errors.InvalidResponse('Could not get key shares info, code: %04X' % sw)
 
-        # TODO: remove
-        print(format_data(res))
-
         key_shares = []
         cur_share = None
 
@@ -360,8 +357,7 @@ class App(Cmd):
         select = [0x00, 0xA4, 0x04, 0x00, len(id)]
 
         resp, sw = self.transmit(select + id)
-        print resp
-        print '%04X ' % (sw)
+        logger.debug('Selecting applet, response: %s, code: %04X' % (resp, sw))
         return resp, sw
 
     def send_add_share(self, data):
@@ -381,7 +377,7 @@ class App(Cmd):
         return res, sw
 
     def transmit(self, data):
-        print('Data: %s' % format_data(data))
+        logger.debug('Data: %s' % format_data(data))
         resp, sw1, sw2 = self.connection.transmit(data)
         sw = (sw1 << 8) | sw2
         return resp, sw
