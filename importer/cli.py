@@ -97,13 +97,12 @@ class App(Cmd):
         self.connect_card()
         self.select_importcard()
 
-        res, sw = self.transmit([0xb6, 0xe1, 0x0, 0x0])
-        print res
-        print '%04x' % sw
+        res, sw = self.send_get_logs()
+        print(res, '%04X' % sw)
 
-        res, sw = self.transmit(toBytes('00A4040000'))
-        print res
-        print '%04x' % sw
+        res, sw = self.send_get_shares()
+        print(res, '%04X' % sw)
+
 
         # Enter key share
         while True:
@@ -163,6 +162,22 @@ class App(Cmd):
         print resp
         print '%04X ' % (sw)
         return resp, sw
+
+    def send_add_share(self, data):
+        res, sw = self.transmit([0xb6, 0x31, 0x0, len(data)] + data)
+        return res, sw
+
+    def send_get_logs(self):
+        res, sw = self.transmit([0xb6, 0xe7, 0x0, 0x0])
+        return res, sw
+
+    def send_get_shares(self):
+        res, sw = self.transmit([0xb6, 0x35, 0x0, 0x0])
+        return res, sw
+
+    def send_erase_shares(self):
+        res, sw = self.transmit([0xb6, 0x33, 0x0, 0x0])
+        return res, sw
 
     def transmit(self, data):
         print('Data: %s' % self.format_data(data))
