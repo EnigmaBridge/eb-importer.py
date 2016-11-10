@@ -108,14 +108,17 @@ class App(Cmd):
         res, sw = self.send_get_logs()
         print(res, '%04X' % sw)
 
-        res, sw = self.send_get_shares()
-        print(res, '%04X' % sw)
-
-        self.add_share(0)
+        # res, sw = self.send_get_logs()
+        # print(self.format_data(res), '%04X' % sw)
+        #
+        # res, sw = self.send_get_shares()
+        # print(self.format_data(res), '%04X' % sw)
 
         # Continue...
-
+        code, res, sw = self.add_share(1)
+        print(self.format_data(res), '%04X' % sw)
         return self.return_code(0)
+
 
     def add_share(self, idx):
         # Enter key share
@@ -181,13 +184,14 @@ class App(Cmd):
 
         # Add share to the card - format the data.
         # 0xa9 | <key length - 2B> | <share index - 1 B> | <share value> | 0xad | <message length - 2B> | <text message>
-        data_buff = 'a9%04x%02x' % (len(key_share_arr) & 0xffff, idx & 0xff)
+        data_buff = 'a9%04x%02x' % ((len(key_share_arr) + 1) & 0xffff, idx & 0xff)
         data_buff += key_share
         data_buff += 'ad%04x' % len(txt_desc_hex)
         data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
-        logger.debug('Import Msg: %s' % data_buff)
+        data_arr = toBytes(data_buff)
 
-        res, sw = self.send_add_share(toBytes(data_buff))
+        logger.debug('Import Msg: %s' % data_buff)
+        res, sw = self.send_add_share(data_arr)
         if sw != 0x9000:
             logger.error('Invalid card return code: %04x' % sw)
             return 1, res, sw
@@ -228,19 +232,19 @@ class App(Cmd):
         return resp, sw
 
     def send_add_share(self, data):
-        res, sw = self.transmit([0xb6, 0x31, 0x0, len(data)] + data)
+        res, sw = self.transmit([0xb6, 0x31, 0x0, 0x0, len(data)] + data)
         return res, sw
 
     def send_get_logs(self):
-        res, sw = self.transmit([0xb6, 0xe7, 0x0, 0x0])
+        res, sw = self.transmit([0xb6, 0xe7, 0x0, 0x0, 0x0])
         return res, sw
 
     def send_get_shares(self):
-        res, sw = self.transmit([0xb6, 0x35, 0x0, 0x0])
+        res, sw = self.transmit([0xb6, 0x35, 0x0, 0x0, 0x0])
         return res, sw
 
     def send_erase_shares(self):
-        res, sw = self.transmit([0xb6, 0x33, 0x0, 0x0])
+        res, sw = self.transmit([0xb6, 0x33, 0x0, 0x0, 0x0])
         return res, sw
 
     def transmit(self, data):
