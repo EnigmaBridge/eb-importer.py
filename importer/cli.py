@@ -157,7 +157,7 @@ class App(Cmd):
         return resp, sw
 
     def select_applet(self, id):
-        select = [0xA0, 0xA4, 0x00, 0x00, len(id)]
+        select = [0x00, 0xA4, 0x04, 0x00, len(id)]
 
         resp, sw = self.transmit(select + id)
         print resp
