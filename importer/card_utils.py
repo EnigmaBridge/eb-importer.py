@@ -45,6 +45,16 @@ def get_key_type(type_idx):
     return key_types[type_idx]
 
 
+def is_continue_status(sw):
+    return (sw & 0x6100) == 0x6100
+
+
+def get_continue_bytes(sw):
+    if is_continue_status(sw):
+        return sw & 0xff
+    return None
+
+
 class KeyShareInfo(object):
     """
     Key share info returned by the card

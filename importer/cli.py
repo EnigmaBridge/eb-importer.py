@@ -16,7 +16,7 @@ import base64
 import datetime
 from blessed import Terminal
 from core import Core
-from card_utils import KeyShareInfo, format_data, get_2bytes, get_key_types, get_key_type
+from card_utils import KeyShareInfo, format_data, get_2bytes, get_key_types, get_key_type, get_continue_bytes
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
@@ -167,6 +167,19 @@ class App(Cmd):
             return self.return_code(1)
 
         print('All shares erased successfully')
+        return self.return_code(0)
+
+    def do_logs(self, line):
+        """Dump logs"""
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
+        # Dump logs
+        resp, sw = self.get_logs()
+        # if sw != 0x9000:
+        #     logger.error('Could not erase all shares, code: %04X' % sw)
+        #     return self.return_code(1)
+        # print('All shares erased successfully')
         return self.return_code(0)
 
     def bootstrap(self):
@@ -333,6 +346,14 @@ class App(Cmd):
 
         return key_shares
 
+    def get_logs(self, limit=None):
+        res, sw = self.send_get_logs()
+
+        # Process
+        print(format_data(res))
+        
+
+
     def connect_card(self):
         try:
             self.connection = self.card.createConnection()
@@ -354,25 +375,47 @@ class App(Cmd):
     def select_applet(self, id):
         select = [0x00, 0xA4, 0x04, 0x00, len(id)]
 
-        resp, sw = self.transmit(select + id)
+        resp, sw = self.transmit_long(select + id)
         logger.debug('Selecting applet, response: %s, code: %04X' % (resp, sw))
         return resp, sw
 
     def send_add_share(self, data):
-        res, sw = self.transmit([0xb6, 0x31, 0x0, 0x0, len(data)] + data)
+        res, sw = self.transmit_long([0xb6, 0x31, 0x0, 0x0, len(data)] + data)
         return res, sw
 
     def send_get_logs(self):
-        res, sw = self.transmit([0xb6, 0xe7, 0x0, 0x0, 0x0])
+        res, sw = self.transmit_long([0xb6, 0xe7, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_continuation(self, code):
+        res, sw = self.transmit([0x00, 0xc0, 0x00, 0x00, code])
         return res, sw
 
     def send_get_shares(self):
-        res, sw = self.transmit([0xb6, 0x35, 0x0, 0x0, 0x0])
+        res, sw = self.transmit_long([0xb6, 0x35, 0x0, 0x0, 0x0])
         return res, sw
 
     def send_erase_shares(self):
-        res, sw = self.transmit([0xb6, 0x33, 0x0, 0x0, 0x0])
+        res, sw = self.transmit_long([0xb6, 0x33, 0x0, 0x0, 0x0])
         return res, sw
+
+    def transmit_long(self, data, **kwargs):
+        """
+        Transmits data with option of long buffer reading - multiple reads
+        :param data:
+        :return:
+        """
+        resp, sw = self.transmit(data)
+        cont_bytes = get_continue_bytes(sw)
+
+        # Dump continued data
+        while cont_bytes is not None:
+            res2, sw2 = self.send_continuation(cont_bytes)
+            cont_bytes = get_continue_bytes(sw2)
+            resp += res2 if res2 is not None else []
+            sw = sw2
+
+        return resp, sw
 
     def transmit(self, data):
         logger.debug('Data: %s' % format_data(data))
@@ -601,6 +644,9 @@ class App(Cmd):
         # Terminate after execution is over on the non-interactive mode
         if self.noninteractive:
             sys.argv.append('quit')
+
+        if self.args.debug:
+            coloredlogs.install(level=logging.DEBUG)
 
         self.cmdloop()
         sys.argv = args_src
