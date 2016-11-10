@@ -30,6 +30,21 @@ def get_2bytes(data, offset=0):
     return (data[offset] << 8) | data[offset + 1]
 
 
+def get_key_types():
+    return ['AES', '3DES']
+
+
+def get_key_type(type_idx):
+    if type_idx is None:
+        return None
+
+    key_types = get_key_types()
+    if type_idx >= len(key_types):
+        return None
+
+    return key_types[type_idx]
+
+
 class KeyShareInfo(object):
     """
     Key share info returned by the card
@@ -41,6 +56,7 @@ class KeyShareInfo(object):
         self.share_len = None
         self.kcv1 = None
         self.kcv2 = None
+        self.key_type = None
 
     def parse_info(self, data):
         """1B - used/unused, 2B - share length, 2B - KCV1, 2B - KCV2"""
@@ -64,7 +80,7 @@ class KeyShareInfo(object):
         pass
 
     def __repr__(self):
-        return 'KeyShareInfo{used: %s, share_len: %d (0x%x), kcv1: 0x%04X, kcv2: 0x%04X, message: \"%s\"}' \
-               % (self.used, self.share_len, self.share_len,
+        return 'KeyShareInfo{type: %s, used: %s, share_len: %d (0x%x), kcv1: 0x%04X, kcv2: 0x%04X, message: \"%s\"}' \
+               % (self.key_type, self.used, self.share_len, self.share_len,
                   self.kcv1, self.kcv2, self.message_str)
 

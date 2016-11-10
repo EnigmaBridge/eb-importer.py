@@ -2,6 +2,7 @@ from cmd2 import Cmd
 import argparse
 import sys
 import os
+import re
 import math
 import types
 import traceback
@@ -15,7 +16,7 @@ import base64
 import datetime
 from blessed import Terminal
 from core import Core
-from card_utils import KeyShareInfo, format_data, get_2bytes
+from card_utils import KeyShareInfo, format_data, get_2bytes, get_key_types, get_key_type
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
@@ -90,8 +91,10 @@ class App(Cmd):
 
     def do_usage(self, line):
         """TODO: Writes simple usage hints"""
-        print('init   - initializes the PKI key management instance with new identity')
-        print('renew  - renews publicly trusted certificate for secure web access')
+        print('init   - TODO:fix')
+        print('add    - adds a new key share')
+        print('list   - lists all key shares')
+        print('erase  - removes all key shares')
         print('usage  - writes this usage info')
 
     def do_init(self, line):
@@ -116,8 +119,15 @@ class App(Cmd):
         # print(format_data(res), '%04X' % sw)
 
         # Continue...
-        code, res, sw = self.add_share(1)
+        code, res, sw = self.add_share()
         print(format_data(res), '%04X' % sw)
+        return self.return_code(0)
+
+    def do_add(self, line):
+        """Adds a new share to the card"""
+        code, res, sw = self.add_share()
+        if code == 0:
+            print(self.t.green('New share added successfully!'))
         return self.return_code(0)
 
     def do_list(self, line):
@@ -132,6 +142,8 @@ class App(Cmd):
                 print(' - EMPTY')
                 continue
 
+            type_str = get_key_type(share.key_type)
+            print(' - Type: %s' % (type_str if type_str is not None else '?'))
             print(' - Used: %s' % share.used)
             print(' - Share length: %d' % share.share_len)
             print(' - KCV1: %04X' % share.kcv1)
@@ -169,10 +181,37 @@ class App(Cmd):
         self.select_importcard()
         return self.return_code(0)
 
-    def add_share(self, idx):
+    def add_share(self, share_idx=None):
         # Enter key share
-        key_share, key_share_bin, key_share_arr, kcv = None, None, None, None
+        key_types = get_key_types()
+        key_type, key_share, key_share_bin, key_share_arr, kcv = None, None, None, None, None
+
+        print('\nAdd new key share procedure started\n')
+
+        # Ask for share idx
+        if share_idx is None:
+            print('Please, pick the key share index you are going to add:')
+            while True:
+                try:
+                    share_idx = int(raw_input('Key share (1/2/3): ').strip())
+                    if share_idx <= 0 or share_idx > 3:
+                        continue
+                    break
+                except Exception as e:
+                    pass
+            print('')
+
+        # Ask for key type
+        print('Please, select the key type: ')
+        while True:
+            try:
+                key_type = self.select(enumerate(key_types), 'Key type ID: ')
+                break
+            except Exception as e:
+                pass
         print('')
+
+        # Ask for key value
         while True:
             try:
                 question = 'Now please enter your key share in hex-coded form: \n'
@@ -180,7 +219,12 @@ class App(Cmd):
                 key_share = key_share.replace(' ', '')
                 key_share_bin = base64.b16decode(key_share)
                 key_share_arr = toBytes(key_share)
-                kcv = utils.compute_kcv_3des(key_share_bin)
+                if key_type == 0:
+                    kcv = utils.compute_kcv_aes(key_share_bin)
+                elif key_type == 1:
+                    kcv = utils.compute_kcv_3des(key_share_bin)
+                else:
+                    raise ValueError('Unknown key type, cannot compute KCV')
 
                 print('\nYou entered the following key share: \n  %s\n  KVC: %s\n'
                       % (format_data(key_share_arr), format_data(kcv[0:3])))
@@ -200,30 +244,33 @@ class App(Cmd):
 
         # Get more detailed info on the share - for the audit
         # date, time, name, key ID, key source
-        print('\nNow please enter auxiliary key share information for audit: \n')
-        dt = datetime.datetime.now().isoformat(' ')
+        print('\nNow please enter auxiliary key share information for audit.')
 
-        data_to_fill = ['Name', 'Key ID', 'Key Source']
-        data_values = []
-        for cur_field in data_to_fill:
-            while True:
-                answer = raw_input(' - %s: ' % cur_field).strip()
-                ok = self.ask_proceed('You entered: \"%s\". Is this correct? (y/n): ' % answer)
-                if ok:
-                    data_values.append(answer)
-                    break
-        name, key_id, key_src = data_values
-        txt_desc = '%s, %s, %s, %s' % (dt, name, key_id, key_src)
-        txt_desc = 'test'
+        dt, key_id = None, None
+        while True:
+            # Date, device does not have a local time
+            dt = self.ask_date(' - Enter date in the format YY/MM/DD: ', ask_correct=False)
+
+            # Key ID
+            key_id = raw_input(' - Key ID (10 chars max): ').strip()
+            if len(key_id) > 10:
+                key_id = key_id[0:10]
+
+            print('\nDate: %d/%d/%d, key ID: %s' % (dt[0], dt[1], dt[2], key_id))
+            ok = self.ask_proceed('Is this correct? (y/n): ')
+            if ok:
+                break
+
+        txt_desc = '%d%d%d%s' % (dt[0], dt[1], dt[2], key_id)
         txt_desc_hex = [ord(x) for x in txt_desc]
 
         print('-'*self.get_term_width())
         print('\nSummary of the key to import:')
+        print(' - Share index: %d' % share_idx)
+        print(' - Key type: %s' % key_types[key_type])
         print(' - Key: %s\n - KVC: %s' % (format_data(key_share_arr), format_data(kcv[0:3])))
-        print('\n - Date: %s' % dt)
-        print(' - Name: %s' % name)
+        print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
-        print(' - Key Source: %s' % key_src)
         print(' - Text descriptor: %s' % txt_desc)
         print('\n')
 
@@ -234,7 +281,7 @@ class App(Cmd):
 
         # Add share to the card - format the data.
         # 0xa9 | <key length - 2B> | <share index - 1 B> | <share value> | 0xad | <message length - 2B> | <text message>
-        data_buff = 'a9%04x%02x' % ((len(key_share_arr) + 1) & 0xffff, idx & 0xff)
+        data_buff = 'a9%04x%02x' % ((len(key_share_arr) + 1) & 0xffff, (share_idx-1) & 0xff)
         data_buff += key_share
         data_buff += 'ad%04x' % len(txt_desc_hex)
         data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
@@ -243,7 +290,7 @@ class App(Cmd):
         logger.debug('Import Msg: %s' % data_buff)
         res, sw = self.send_add_share(data_arr)
         if sw == 0x808f:
-            logger.error('Share %d already exists (code %04X)' % (idx + 1, sw))
+            logger.error('Share %d already exists (code %04X)' % (share_idx, sw))
         elif sw != 0x9000:
             logger.error('Invalid card return code: %04x' % sw)
             return 1, res, sw
@@ -429,6 +476,33 @@ class App(Cmd):
                                     quit_enabled=False)
 
         return ret == self.PROCEED_YES
+
+    def ask_date(self, question=None, ask_correct=True):
+        while True:
+            answer = raw_input(question).strip()
+            match = re.match('^([0-9]{2})/([0-9]{2})/([0-9]{2})$', answer)
+            if not match:
+                print('Date not in the valid format, please, try again')
+                continue
+
+            yy, mm, dd = int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+            # Date test
+            try:
+                tt = datetime.date(2000+yy, mm, dd)
+            except Exception as ex:
+                logger.error('Date format is not valid: %s' % ex)
+                continue
+
+            dt = yy, mm, dd
+
+            if not ask_correct:
+                return dt
+
+            ok = self.ask_proceed('You entered: \"%s\". Is this correct? (y/n): ' % answer)
+            if ok:
+                return dt
+        pass
 
     def check_root(self):
         """Checks if the script was started with root - we need that for file ops :/"""
