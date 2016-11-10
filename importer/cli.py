@@ -17,10 +17,17 @@ from core import Core
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
-import logging
+import logging, coloredlogs
 
 
 logger = logging.getLogger(__name__)
+coloredlogs.install()
+
+# logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+# rootLogger = logging.getLogger()
+# consoleHandler = logging.StreamHandler()
+# consoleHandler.setFormatter(logFormatter)
+# rootLogger.addHandler(consoleHandler)
 
 
 class App(Cmd):
