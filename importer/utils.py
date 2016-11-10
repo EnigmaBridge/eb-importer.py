@@ -20,6 +20,6 @@ def compute_kcv_aes(key):
 
 
 def compute_kcv_3des(key):
-    aes = DES3.new(key, AES.MODE_ECB)
-    return aes.encrypt(get_zero_vector(8))
+    des = DES3.new(key, DES3.MODE_ECB)
+    return des.encrypt(get_zero_vector(8))
 
