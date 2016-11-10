@@ -9,10 +9,14 @@ import pid
 import time
 import textwrap
 import errors
+import utils
+import types
+import base64
 from blessed import Terminal
 from core import Core
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
+from smartcard.util import toHexString, toBytes
 import logging
 
 
@@ -47,6 +51,7 @@ class App(Cmd):
         self.update_intro()
 
         self.card = None
+        self.connection = None
 
     def load_version(self):
         dist = None
@@ -89,9 +94,42 @@ class App(Cmd):
 
         # Pick card to use
         self.select_card()
+        self.connect_card()
+        self.select_importcard()
 
+        res, sw = self.transmit([0xb6, 0xe1, 0x0, 0x0])
+        print res
+        print '%04x' % sw
 
-        return self.return_code(1)
+        res, sw = self.transmit(toBytes('00A4040000'))
+        print res
+        print '%04x' % sw
+
+        # Enter key share
+        while True:
+            try:
+                question = 'Now please enter your key share in hexcoded form: \n'
+                key_share = raw_input(question).strip().upper()
+                key_share = key_share.replace(' ', '')
+                key_share_bin = base64.b16decode(key_share)
+                key_share_arr = toBytes(key_share)
+                kcv = utils.compute_kcv_aes(key_share_bin)
+
+                print('\nYou entered the following key share: \n  %s\n  KVC: %s\n'
+                      % (self.format_data(key_share_arr), self.format_data(kcv[0:3])))
+
+                ok = self.ask_proceed('Is it correct? (y/n): ')
+                if ok:
+                    break
+                print('\n')
+            except Exception as e:
+                logger.error('Error in adding a new key share: %s' % e)
+                if self.args.debug:
+                    traceback.print_exc()
+
+        # Continue...
+
+        return self.return_code(0)
 
     def return_code(self, code=0):
         self.last_result = code
@@ -101,6 +139,47 @@ class App(Cmd):
         for lines in range(iter):
             print('')
             time.sleep(0.1)
+
+    def connect_card(self):
+        try:
+            self.connection = self.card.createConnection()
+            self.connection.connect()
+        except Exception as e:
+            logger.error('Exception in opening a connection: %s' % e)
+            if self.args.debug:
+                traceback.print_exc()
+            raise e
+
+    def select_importcard(self):
+        resp, sw = self.select_applet([0x31, 0x32, 0x33, 0x34, 0x35, 0x36])
+        # TODO: check if success
+
+        return resp, sw
+
+    def select_applet(self, id):
+        select = [0xA0, 0xA4, 0x00, 0x00, len(id)]
+
+        resp, sw = self.transmit(select + id)
+        print resp
+        print '%04X ' % (sw)
+        return resp, sw
+
+    def transmit(self, data):
+        print('Data: %s' % self.format_data(data))
+        resp, sw1, sw2 = self.connection.transmit(data)
+        sw = (sw1 << 8) | sw2
+        return resp, sw
+
+    def format_data(self, data):
+        str_res = ''
+        for x in data:
+            if isinstance(x, (types.IntType, types.LongType)):
+                str_res += '%02X ' % x
+            elif isinstance(x, types.StringTypes):
+                str_res += '%02X ' % ord(x)
+            else:
+                raise ValueError('Unknown type: ', x)
+        return str_res.strip()
 
     def select_card(self):
         rlist = readers()
@@ -126,18 +205,20 @@ class App(Cmd):
                     if selected < 0:
                         raise ValueError('Negative')
 
-                    ok = self.ask_proceed('You choose card reader "%d. %s", is it correct? (y/n): '
+                    ok = self.ask_proceed('\nYou choose card reader "%d. %s", is it correct? (y/n): '
                                           % (selected+1, available_readers[selected]),
                                           support_non_interactive=True, non_interactive_return=True)
                     if ok:
+                        print('\n')
                         break
 
                 except Exception as e:
                     pass
 
         self.card = available_readers[selected]
+        print('\nGoing to use the card: %s' % self.card)
         return 0
-    
+
     def ask_proceed_quit(self, question=None, support_non_interactive=False, non_interactive_return=PROCEED_YES, quit_enabled=True):
         """Ask if user wants to proceed"""
         opts = 'Y/n/q' if quit_enabled else 'Y/n'
