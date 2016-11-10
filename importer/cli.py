@@ -12,6 +12,7 @@ import errors
 import utils
 import types
 import base64
+import datetime
 from blessed import Terminal
 from core import Core
 from pkg_resources import get_distribution, DistributionNotFound
@@ -110,32 +111,88 @@ class App(Cmd):
         res, sw = self.send_get_shares()
         print(res, '%04X' % sw)
 
+        self.add_share(0)
 
+        # Continue...
+
+        return self.return_code(0)
+
+    def add_share(self, idx):
         # Enter key share
+        key_share, key_share_bin, key_share_arr, kcv = None, None, None, None
+        print('')
         while True:
             try:
-                question = 'Now please enter your key share in hexcoded form: \n'
+                question = 'Now please enter your key share in hex-coded form: \n'
                 key_share = raw_input(question).strip().upper()
                 key_share = key_share.replace(' ', '')
                 key_share_bin = base64.b16decode(key_share)
                 key_share_arr = toBytes(key_share)
-                kcv = utils.compute_kcv_aes(key_share_bin)
+                kcv = utils.compute_kcv_3des(key_share_bin)
 
                 print('\nYou entered the following key share: \n  %s\n  KVC: %s\n'
                       % (self.format_data(key_share_arr), self.format_data(kcv[0:3])))
 
-                ok = self.ask_proceed('Is it correct? (y/n): ')
-                if ok:
+                ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
+                if ok == self.PROCEED_QUIT:
+                    return self.return_code(1)
+                elif ok == self.PROCEED_YES:
                     break
+
                 print('\n')
             except Exception as e:
                 logger.error('Error in adding a new key share: %s' % e)
                 if self.args.debug:
                     traceback.print_exc()
+        pass
 
-        # Continue...
+        # Get more detailed info on the share - for the audit
+        # date, time, name, key ID, key source
+        print('\nNow please enter auxiliary key share information for audit: \n')
+        dt = datetime.datetime.now().isoformat(' ')
 
-        return self.return_code(0)
+        data_to_fill = ['Name', 'Key ID', 'Key Source']
+        data_values = []
+        for cur_field in data_to_fill:
+            while True:
+                answer = raw_input(' - %s: ' % cur_field).strip()
+                ok = self.ask_proceed('You entered: \"%s\". Is this correct? (y/n): ' % answer)
+                if ok:
+                    data_values.append(answer)
+                    break
+        name, key_id, key_src = data_values
+        txt_desc = '%s, %s, %s, %s' % (dt, name, key_id, key_src)
+        txt_desc_hex = [ord(x) for x in txt_desc]
+
+        print('-'*self.get_term_width())
+        print('\nSummary of the key to import:')
+        print(' - Key: %s\n - KVC: %s' % (self.format_data(key_share_arr), self.format_data(kcv[0:3])))
+        print('\n - Date: %s' % dt)
+        print(' - Name: %s' % name)
+        print(' - Key ID: %s' % key_id)
+        print(' - Key Source: %s' % key_src)
+        print(' - Text descriptor: %s' % txt_desc)
+        print('\n')
+
+        ok = self.ask_proceed('Shall the key share be imported? (y/n): ')
+        if not ok:
+            logger.error('Key import aborted')
+            return self.return_code(1)
+
+        # Add share to the card - format the data.
+        # 0xa9 | <key length - 2B> | <share index - 1 B> | <share value> | 0xad | <message length - 2B> | <text message>
+        data_buff = 'a9%04x%02x' % (len(key_share_arr) & 0xffff, idx & 0xff)
+        data_buff += key_share
+        data_buff += 'ad%04x' % len(txt_desc_hex)
+        data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
+        logger.debug('Import Msg: %s' % data_buff)
+
+        res, sw = self.send_add_share(toBytes(data_buff))
+        if sw != 0x9000:
+            logger.error('Invalid card return code: %04x' % sw)
+            return 1, res, sw
+
+        return 0, res, sw
 
     def return_code(self, code=0):
         self.last_result = code
