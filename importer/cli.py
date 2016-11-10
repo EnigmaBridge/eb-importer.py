@@ -210,7 +210,9 @@ class App(Cmd):
 
         logger.debug('Import Msg: %s' % data_buff)
         res, sw = self.send_add_share(data_arr)
-        if sw != 0x9000:
+        if sw == 0x808f:
+            logger.error('Share %d already exists (code %04X)' % (idx + 1, sw))
+        elif sw != 0x9000:
             logger.error('Invalid card return code: %04x' % sw)
             return 1, res, sw
 
