@@ -15,6 +15,7 @@ import base64
 import datetime
 from blessed import Terminal
 from core import Core
+from card_utils import KeyShareInfo, format_data, get_2bytes
 from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
@@ -105,37 +106,67 @@ class App(Cmd):
         self.connect_card()
         self.select_importcard()
 
-        res, sw = self.send_get_logs()
-        print(res, '%04X' % sw)
+        res, sw = self.transmit(toBytes('b631000026a900110011111111111111111111111111111111ad000f74657374206d6573736167653a2030'))
+        print(format_data(res), '%04X' % sw)
 
         # res, sw = self.send_get_logs()
-        # print(self.format_data(res), '%04X' % sw)
+        # print(format_data(res), '%04X' % sw)
         #
         # res, sw = self.send_get_shares()
-        # print(self.format_data(res), '%04X' % sw)
+        # print(format_data(res), '%04X' % sw)
 
         # Continue...
         code, res, sw = self.add_share(1)
-        print(self.format_data(res), '%04X' % sw)
+        print(format_data(res), '%04X' % sw)
         return self.return_code(0)
 
     def do_list(self, line):
         """List all shares"""
-        pass
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
+        shares = self.get_shares()
+        for idx, share in enumerate(shares):
+            print('\nShare idx %d: ' % (idx+1))
+            if not share.used:
+                print(' - EMPTY')
+                continue
+
+            print(' - Used: %s' % share.used)
+            print(' - Share length: %d' % share.share_len)
+            print(' - KCV1: %04X' % share.kcv1)
+            print(' - KCV2: %04X' % share.kcv2)
+            print(' - Message: %s' % share.message_str)
+        print('')
 
     def do_erase(self, line):
         """Deletes all shares present"""
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
+        # Warning
         print(self.t.underline_red('! WARNING !'))
         print('This is a destructive operation, all shares will be unrecoverably deleted from the token')
         if not self.ask_proceed('Do you really want to remove all key shares? (y/n): ', support_non_interactive=True):
             return self.return_code(1)
 
+        # Erase
         resp, sw = self.send_erase_shares()
         if sw != 0x9000:
             logger.error('Could not erase all shares, code: %04X' % sw)
             return self.return_code(1)
 
         print('All shares erased successfully')
+        return self.return_code(0)
+
+    def bootstrap(self):
+        if not self.check_root() or not self.check_pid():
+            return self.return_code(1)
+
+        # Pick card to use
+        self.select_card()
+        self.connect_card()
+        self.select_importcard()
         return self.return_code(0)
 
     def add_share(self, idx):
@@ -152,7 +183,7 @@ class App(Cmd):
                 kcv = utils.compute_kcv_3des(key_share_bin)
 
                 print('\nYou entered the following key share: \n  %s\n  KVC: %s\n'
-                      % (self.format_data(key_share_arr), self.format_data(kcv[0:3])))
+                      % (format_data(key_share_arr), format_data(kcv[0:3])))
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
                 if ok == self.PROCEED_QUIT:
@@ -183,11 +214,12 @@ class App(Cmd):
                     break
         name, key_id, key_src = data_values
         txt_desc = '%s, %s, %s, %s' % (dt, name, key_id, key_src)
+        txt_desc = 'test'
         txt_desc_hex = [ord(x) for x in txt_desc]
 
         print('-'*self.get_term_width())
         print('\nSummary of the key to import:')
-        print(' - Key: %s\n - KVC: %s' % (self.format_data(key_share_arr), self.format_data(kcv[0:3])))
+        print(' - Key: %s\n - KVC: %s' % (format_data(key_share_arr), format_data(kcv[0:3])))
         print('\n - Date: %s' % dt)
         print(' - Name: %s' % name)
         print(' - Key ID: %s' % key_id)
@@ -218,7 +250,46 @@ class App(Cmd):
 
         return 0, res, sw
 
+    def get_shares(self):
+        res, sw = self.send_get_shares()
+        if sw != 0x9000:
+            logger.error('Could not get key shares info, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get key shares info, code: %04X' % sw)
 
+        # TODO: remove
+        print(format_data(res))
+
+        key_shares = []
+        cur_share = None
+
+        # TLV parser
+        tlen = len(res)
+        tag, clen, idx = 0, 0, 0
+        while idx < tlen:
+            tag = res[idx]
+            clen = get_2bytes(res, idx+1)
+            idx += 3
+            cdata = res[idx: (idx + clen)]
+
+            if tag == 0xa9:
+                # KeyShare info
+                if cur_share is not None:
+                    key_shares.append(cur_share)
+
+                cur_share = KeyShareInfo()
+                cur_share.parse_info(cdata)
+
+            elif tag == 0xad:
+                # KeyShare message
+                cur_share.parse_message(cdata)
+
+            idx += clen
+        pass
+
+        if cur_share is not None:
+            key_shares.append(cur_share)
+
+        return key_shares
 
     def connect_card(self):
         try:
@@ -263,21 +334,10 @@ class App(Cmd):
         return res, sw
 
     def transmit(self, data):
-        print('Data: %s' % self.format_data(data))
+        print('Data: %s' % format_data(data))
         resp, sw1, sw2 = self.connection.transmit(data)
         sw = (sw1 << 8) | sw2
         return resp, sw
-
-    def format_data(self, data):
-        str_res = ''
-        for x in data:
-            if isinstance(x, (types.IntType, types.LongType)):
-                str_res += '%02X ' % x
-            elif isinstance(x, types.StringTypes):
-                str_res += '%02X ' % ord(x)
-            else:
-                raise ValueError('Unknown type: ', x)
-        return str_res.strip()
 
     def select_card(self):
         rlist = readers()
