@@ -6,6 +6,7 @@ import sys
 import types
 import utils
 import base64
+import math
 import subprocess
 import threading
 import socket
@@ -221,7 +222,32 @@ class Logs(object):
         """
         Sorts log lines from the latest to the newest
         """
-        self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
+
+        # Overflows total ID computation.
+        # The last used log entry is the latest.
+        # Scan logs in DESC ordering, if there is a big shift compared to the previous ID,
+        # overflow happened. Overflow is up-to-date for the last record only. Fot others it has to
+        # be recomputed.
+        lines = self.lines
+        max_id = None
+        offset = 0L
+        for idx in range(len(lines)-1, -1, -1):
+            clog = lines[idx]
+            if not clog.used:
+                continue
+
+            clog.id |= self.overflows << 16
+            clog.id -= offset
+            if max_id is None:
+                max_id = clog.id
+                continue
+
+            diff = abs(lines[idx+1].id - lines[idx].id)
+            if diff >= 0x7fffL:
+                offset += 0x10000L
+                clog.id -= offset
+
+        # self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
 
     def __repr__(self):
         return 'Logs{entries: %s, overflows: 0x%x, lines: %s, signature: %s}' \
@@ -235,13 +261,16 @@ class LogLine(object):
     def __init__(self, *args, **kwargs):
         self.used = None
         self.status = None
+        self.raw_id = None
+        self.orig_id = None
         self.id = None
+        self.total_id = None
         self.len = None
         self.operation = None
         self.share_id = None
         self.uoid = None
 
-    def parse_line(self, data):
+    def parse_line(self, data, logs=None):
         """
         <1B - used/not> | <2B - log entry status > | <2B - item ID> | <2B - msg length> | <8B - message>
 
@@ -255,11 +284,13 @@ class LogLine(object):
 
         self.used = data[0] != 0
         self.status = get_2bytes(data, 1)
-        self.id = get_2bytes(data, 3)
+        self.raw_id = long(get_2bytes(data, 3))
         self.len = get_2bytes(data, 5)
         self.operation = data[7]
         self.share_id = data[8]
         self.uoid = (get_2bytes(data, 9) << 16) | get_2bytes(data, 11)
+        self.id = self.raw_id - 0x8000
+        self.orig_id = self.id
 
     def __repr__(self):
         return 'LogLine{used: %s, status: %d (0x%x), id: 0x%x, len: %d (0x%x), op: 0x%x, share_id: %d, uoid: %08x}' \

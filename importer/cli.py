@@ -212,13 +212,18 @@ class App(Cmd):
             return self.return_code(1)
 
         # Pick card to use
-        self.select_card()
-        if self.card is None:
-            return self.return_code(2)
+        try:
+            self.select_card()
+            if self.card is None:
+                return self.return_code(2)
 
-        self.connect_card()
-        self.select_importcard()
-        return self.return_code(0)
+            self.connect_card()
+            self.select_importcard()
+            return self.return_code(0)
+
+        except Exception as e:
+            logger.error('Exception in setting import card: %s', e)
+            raise
 
     def dump_share(self, idx, share):
         if idx == 3:
@@ -444,7 +449,7 @@ class App(Cmd):
                     cline = cdata[offset:offset+15]
 
                     cur_log = LogLine()
-                    cur_log.parse_line(cline)
+                    cur_log.parse_line(cline, logs)
                     logs.add(cur_log)
 
             elif tag == 0xab:
@@ -453,6 +458,7 @@ class App(Cmd):
 
             idx += clen
 
+        # Fix the ordering w.r.t. overflows counter
         logs.sort()
         return logs
 
