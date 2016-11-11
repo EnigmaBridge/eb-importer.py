@@ -101,8 +101,55 @@ def remove_parity_bits_3des(key_bits):
     res = ''.join([chr(int(x)) for x in res_key])
     return res
 
+
+class KeyType(object):
+    def __init__(self, name=None, id=None, key_len=None, kcv_fnc=None, *args, **kwargs):
+        self.name = name
+        self.id = id
+        self.key_len = key_len
+        self.kcv_fnc = kcv_fnc
+
+    def process_key(self, key_hex):
+        return key_hex
+
+    def __repr__(self):
+        return self.name
+
+
+class KeyType3DES(KeyType):
+    def __init__(self, *args, **kwargs):
+        super(KeyType3DES, self).__init__(*args, **kwargs)
+
+    def process_key(self, key_hex):
+        ln = len(key_hex.strip())
+        if ln % 2 != 0:
+            raise ValueError('Key value hex-coding has odd number of digits')
+        ln /= 2
+
+        key_bits = base64.b16decode(key_hex, True)
+
+        # Fix parity bits
+        if ln == self.key_len:
+            key_bits = fix_parity_bits_3des(key_bits)
+            return base64.b16encode(key_bits)
+
+        # Add parity bits
+        non_parity_len = self.key_len - self.key_len/8
+        if ln != non_parity_len:
+            raise ValueError('Key Type %s is not neither %s B nor %s B long' % (self.name, self.key_len, non_parity_len))
+
+        key_bits = add_parity_bits_3des(key_bits)
+        return base64.b16encode(key_bits)
+
+
+KEY_TYPE_AES_128 = KeyType(name="AES-128", id=0x01, key_len=16, kcv_fnc=utils.compute_kcv_aes)
+KEY_TYPE_AES_256 = KeyType(name="AES-256", id=0x10, key_len=32, kcv_fnc=utils.compute_kcv_aes)
+KEY_TYPE_3DES_112 = KeyType3DES(name="3DES-112", id=0x20, key_len=16, kcv_fnc=utils.compute_kcv_3des)
+KEY_TYPE_3DES_168 = KeyType3DES(name="3DES-168", id=0x40, key_len=24, kcv_fnc=utils.compute_kcv_3des)
+
+
 def get_key_types():
-    return ['AES-128', 'AES-192', 'AES-256', '3DES']
+    return [KEY_TYPE_AES_128, KEY_TYPE_AES_256, KEY_TYPE_3DES_112, KEY_TYPE_3DES_168]
 
 
 def get_key_type(type_idx):
@@ -130,14 +177,15 @@ class KeyShareInfo(object):
         self.key_type = None
 
     def parse_info(self, data):
-        """1B - used/unused, 2B - share length, 2B - KCV1, 2B - KCV2"""
-        if len(data) < 7:
+        """1B - used/unused, 1B - key type, 2B - share length, 2B - KCV1, 2B - KCV2"""
+        if len(data) < 8:
             raise ValueError('KeyShare info is supposed to have at least 7 Bytes')
 
         self.used = data[0] != 0
-        self.share_len = get_2bytes(data, 1)
-        self.kcv1 = get_2bytes(data, 3)
-        self.kcv2 = get_2bytes(data, 5)
+        self.key_type = data[1]
+        self.share_len = get_2bytes(data, 2)
+        self.kcv1 = get_2bytes(data, 4)
+        self.kcv2 = get_2bytes(data, 6)
 
     def parse_message(self, data):
         """ASCII text"""

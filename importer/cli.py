@@ -125,7 +125,7 @@ class App(Cmd):
         shares_start = self.get_shares()
         free_shares = []
         for idx, share in enumerate(shares_start):
-            if not share.used:
+            if not share.used and idx != 3:
                 free_shares.append(idx+1)
             self.dump_share(idx, share)
         print('\n')
@@ -221,13 +221,17 @@ class App(Cmd):
         return self.return_code(0)
 
     def dump_share(self, idx, share):
-        print('\nShare idx %d: ' % (idx+1))
+        if idx == 3:
+            print('\nComposite key: ')
+        else:
+            print('\nShare idx %d: ' % (idx+1))
+
         if not share.used:
             print(' - EMPTY')
             return
 
-        type_str = get_key_type(share.key_type)
-        print(' - Type: %s' % (type_str if type_str is not None else '?'))
+        share_type = get_key_type(share.key_type)
+        print(' - Type: %s' % (share_type.name if share_type is not None else '?'))
         print(' - Used: %s' % share.used)
         print(' - Share length: %d' % share.share_len)
         print(' - KCV: %s' % format_data([share.kcv1 >> 8, share.kcv1 & 0xff, share.kcv2 >> 8]))
@@ -236,7 +240,7 @@ class App(Cmd):
     def add_share(self, share_idx=None, free_shares=None):
         # Enter key share
         key_types = get_key_types()
-        key_type, key_share, key_share_bin, key_share_arr, kcv = None, None, None, None, None
+        key_type_idx, key_share, key_share_bin, key_share_arr, kcv = None, None, None, None, None
 
         print('\nAdd new key share procedure started\n')
 
@@ -269,37 +273,37 @@ class App(Cmd):
         print('Please, select the key type: ')
         while True:
             try:
-                key_type = self.select(enumerate(key_types), 'Key type ID: ')
+                key_type_idx = self.select(enumerate(key_types), 'Key type ID: ')
                 break
             except Exception as e:
                 pass
-        print('')
+        key_type = get_key_type(key_type_idx)
 
         # Ask for key value
+        print('')
         while True:
             try:
                 question = 'Now please enter your key share in hex-coded form: \n'
                 key_share = raw_input(question).strip().upper()
                 key_share = key_share.replace(' ', '')
-                key_share_bin = base64.b16decode(key_share)
-                key_share_arr = toBytes(key_share)
-                if key_type == 'AES-128' and len(key_share_arr) != 16:
-                    raise ValueError('AES-128 needs 16B key')
-                if key_type == 'AES-192' and len(key_share_arr) != 24:
-                    raise ValueError('AES-192 needs 24B key')
-                if key_type == 'AES-256' and len(key_share_arr) != 32:
-                    raise ValueError('AES-256 needs 32B key')
-                if key_type == '3DES' and len(key_share_arr) != 32 and len(key_share_arr) != 21:
-                    raise ValueError('3DES key length invalid')
+                key_share_fix = key_type.process_key(key_share)
+                key_share_bin = base64.b16decode(key_share_fix)
+                key_share_arr = toBytes(key_share_fix)
 
-                if key_type <= 2:
-                    kcv = utils.compute_kcv_aes(key_share_bin)
-                elif key_type == 3:
-                    kcv = utils.compute_kcv_3des(key_share_bin)
-                else:
-                    raise ValueError('Unknown key type, cannot compute KCV')
+                if key_type.key_len is not None and key_type.key_len != len(key_share_arr):
+                    raise ValueError('%s needs %s B key' % (key_type.name, key_type.key_len))
 
-                print('\nYou entered the following key share: \n  %s\n  KVC: %s\n'
+                kcv = key_type.kcv_fnc(key_share_bin)
+
+                print('\n')
+                if key_share_fix != key_share and len(key_share_fix) != len(key_share):
+                    print('Entered key was augmented with parity bits, Original key: \n  %s'
+                          % format_data(toBytes(key_share)))
+                elif key_share_fix != key_share:
+                    print('Entered key had invalid parity bits, Original key: \n  %s'
+                          % format_data(toBytes(key_share)))
+
+                print('The following key share will be imported: \n  %s\n  KVC: %s\n'
                       % (format_data(key_share_arr), format_data(kcv[0:3])))
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
@@ -340,7 +344,7 @@ class App(Cmd):
         print('-'*self.get_term_width())
         print('\nSummary of the key to import:')
         print(' - Share index: %d' % share_idx)
-        print(' - Key type: %s' % key_types[key_type])
+        print(' - Key type: %s' % key_type.name)
         print(' - Key: %s\n - KVC: %s' % (format_data(key_share_arr), format_data(kcv[0:3])))
         print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
@@ -353,8 +357,9 @@ class App(Cmd):
             return self.return_code(1)
 
         # Add share to the card - format the data.
-        # 0xa9 | <key length - 2B> | <share index - 1 B> | <share value> | 0xad | <message length - 2B> | <text message>
-        data_buff = 'a9%04x%02x' % ((len(key_share_arr) + 1) & 0xffff, (share_idx-1) & 0xff)
+        # 0xa9 | <key length - 2B> | <share index - 1 B> | <key type - 1 B> |<share value> |
+        # 0xad | <message length - 2B> | <text message - max 16B>
+        data_buff = 'a9%04x%02x%02x' % ((len(key_share_arr) + 2) & 0xffff, (share_idx-1) & 0xff, key_type.id)
         data_buff += key_share
         data_buff += 'ad%04x' % len(txt_desc_hex)
         data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
