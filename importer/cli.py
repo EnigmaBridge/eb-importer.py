@@ -227,8 +227,7 @@ class App(Cmd):
         print(' - Type: %s' % (type_str if type_str is not None else '?'))
         print(' - Used: %s' % share.used)
         print(' - Share length: %d' % share.share_len)
-        print(' - KCV1: %04X' % share.kcv1)
-        print(' - KCV2: %04X' % share.kcv2)
+        print(' - KCV: %s' % format_data([share.kcv1 >> 16, share.kcv1 & 0xff, share.kcv2 >> 16]))
         print(' - Message: %s' % share.message_str)
 
     def add_share(self, share_idx=None, free_shares=None):
