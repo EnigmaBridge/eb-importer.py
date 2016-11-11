@@ -161,15 +161,22 @@ def get_key_types():
     return [KEY_TYPE_AES_128, KEY_TYPE_AES_256, KEY_TYPE_3DES_112, KEY_TYPE_3DES_168]
 
 
-def get_key_type(type_idx):
-    if type_idx is None:
+def get_key_type(type_idx=None, id=None):
+    if type_idx is None and id is None:
         return None
 
     key_types = get_key_types()
-    if type_idx >= len(key_types):
-        return None
 
-    return key_types[type_idx]
+    if type_idx is not None:
+        if type_idx >= len(key_types):
+            return None
+
+        return key_types[type_idx]
+
+    if id is not None:
+        for t in key_types:
+            if t.id == id:
+                return t
 
 
 class KeyShareInfo(object):
