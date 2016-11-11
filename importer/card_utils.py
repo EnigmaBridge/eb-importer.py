@@ -4,6 +4,8 @@ import shlex
 import os
 import sys
 import types
+import utils
+import base64
 import subprocess
 import threading
 import socket
@@ -11,6 +13,8 @@ import hashlib
 import traceback
 from smartcard.System import readers
 from smartcard.util import toHexString
+from Crypto.Util.py3compat import *
+from Crypto.Util.number import long_to_bytes, bytes_to_long, size, ceil_div
 
 
 def format_data(data):
@@ -29,6 +33,74 @@ def get_2bytes(data, offset=0):
     return (data[offset] << 8) | data[offset + 1]
 
 
+def is_continue_status(sw):
+    return (sw >> 8) == 0x61
+
+
+def get_continue_bytes(sw):
+    if is_continue_status(sw):
+        return sw & 0xff
+    return None
+
+
+def hamming_weight(n):
+    return bin(n).count("1")
+
+
+def fix_parity_bits_3des(key_bits):
+    ln = len(key_bits)
+    res_key = ['0'] * ln
+
+    for i in range(0, ln):
+        x = long(ord(key_bits[i]))
+        hw = hamming_weight(x >> 1)
+        if (hw % 2) == 0:
+            res_key[i] = chr(x | 0x1)
+        else:
+            res_key[i] = chr(x & (~0x1))
+
+    return ''.join(res_key)
+
+
+def add_parity_bits_3des(key_bits):
+    ln = len(key_bits)
+    if ((ln*8) % 7.0) != 0:
+        raise ValueError('The key does not have correct size for adding parity bits')
+
+    new_size = ln*8/7
+    res_key = [0L] * new_size
+    key_long = bytes_to_long(key_bits)
+    for i in range(0, new_size):
+        x = key_long & 0x7F
+        p = 1 if hamming_weight(x) % 2 == 0 else 0
+        res_key[new_size - i - 1] = x << 1 | p
+        key_long >>= 7
+
+    res = ''.join([chr(int(x)) for x in res_key])
+    return res
+
+
+def remove_parity_bits_3des(key_bits):
+    ln = len(key_bits)
+    if ((ln*7) % 8.0) != 0:
+        raise ValueError('Invalid key size to remove the parity bits')
+
+    new_size = ln*7/8
+    res_key = [0L] * new_size
+
+    key_new_long = 0L
+    for i in range(0, ln):
+        x = long(ord(key_bits[i])) >> 1
+        key_new_long = (key_new_long << 7) | (x & 0x7f)
+
+    for i in range(0, new_size):
+        x = key_new_long & 0xff
+        res_key[new_size - i - 1] = x
+        key_new_long >>= 8
+
+    res = ''.join([chr(int(x)) for x in res_key])
+    return res
+
 def get_key_types():
     return ['AES-128', 'AES-192', 'AES-256', '3DES']
 
@@ -42,16 +114,6 @@ def get_key_type(type_idx):
         return None
 
     return key_types[type_idx]
-
-
-def is_continue_status(sw):
-    return (sw >> 8) == 0x61
-
-
-def get_continue_bytes(sw):
-    if is_continue_status(sw):
-        return sw & 0xff
-    return None
 
 
 class KeyShareInfo(object):
