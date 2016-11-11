@@ -214,6 +214,8 @@ class Logs(object):
         self.overflows = None
         self.signature = None
         self.container = None
+        self.max_idx = None
+        self.was_sorted = False
 
     def add(self, line):
         self.lines.append(line)
@@ -228,6 +230,9 @@ class Logs(object):
         # Scan logs in DESC ordering, if there is a big shift compared to the previous ID,
         # overflow happened. Overflow is up-to-date for the last record only. Fot others it has to
         # be recomputed.
+        if self.was_sorted:
+            return
+
         lines = self.lines
         max_id = None
         offset = 0L
@@ -240,6 +245,7 @@ class Logs(object):
             clog.id -= offset
             if max_id is None:
                 max_id = clog.id
+                self.max_idx = idx
                 continue
 
             diff = abs(lines[idx+1].id - lines[idx].id)
@@ -247,6 +253,7 @@ class Logs(object):
                 offset += 0x10000L
                 clog.id -= offset
 
+        self.was_sorted = True
         # self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
 
     def __repr__(self):
