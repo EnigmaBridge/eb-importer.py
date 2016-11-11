@@ -151,7 +151,7 @@ class App(Cmd):
         if len(logs_end.lines) > 0:
             print('\nLatest log id: %X' % logs_end_max_id)
             for msg in logs_end.lines:
-                if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id < logs_start_max_id:
+                if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id <= logs_start_max_id:
                     continue
                 print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
                       % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
