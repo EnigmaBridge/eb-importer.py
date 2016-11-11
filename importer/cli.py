@@ -213,6 +213,9 @@ class App(Cmd):
 
         # Pick card to use
         self.select_card()
+        if self.card is None:
+            return self.return_code(2)
+
         self.connect_card()
         self.select_importcard()
         return self.return_code(0)
