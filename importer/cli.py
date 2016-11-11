@@ -82,6 +82,7 @@ class App(Cmd):
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
                      ('\n    Enigma Bridge Key Importer command line interface (v%s) \n' % self.version) + \
+                     '\n    add   - adds a new key share' + \
                      '\n    usage - shows simple command list'
 
         self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
@@ -127,6 +128,7 @@ class App(Cmd):
             if not share.used:
                 free_shares.append(idx+1)
             self.dump_share(idx, share)
+        print('\n')
 
         if len(free_shares) == 0:
             print(self.t.red('Cannot add a new share, all are set'))
