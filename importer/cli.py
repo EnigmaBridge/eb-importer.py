@@ -106,15 +106,16 @@ class App(Cmd):
 
         # Get logs
         logs_start = self.get_logs()
-        logs_start_max_id = logs_start.max_idx
+        logs_start_max_idx = logs_start.max_idx
+        logs_start_max_id = logs_start.lines[logs_start_max_idx].id if logs_start_max_idx is not None else 0
 
         # Show last N logs
-        logs_to_show = logs_start.lines
-        if len(logs_start.lines) > self.last_n_logs:
-            logs_to_show = logs_start.lines[logs_start_max_id - self.last_n_logs - 1: logs_start_max_id+1]
+        logs_to_show = [x for x in logs_start.lines if x.used]
+        if len(logs_to_show) > self.last_n_logs and logs_start_max_idx is not None:
+            logs_to_show = logs_start.lines[logs_start_max_idx - self.last_n_logs + 1: logs_start_max_idx+1]
 
         if len(logs_to_show) > 0:
-            print('Last %d log lines: ' % self.last_n_logs)
+            print('Last %d log lines: ' % len(logs_to_show))
             for msg in logs_to_show:
                 op_str = 'N/A'
                 if msg.operation in operation_logs:
@@ -122,6 +123,8 @@ class App(Cmd):
 
                 print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
                       % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
+        else:
+            print('There are no logs on the card')
 
         # Show all shares
         shares_start = self.get_shares()
@@ -148,11 +151,12 @@ class App(Cmd):
 
         # Logs since last dump
         logs_end = self.get_logs()
-        logs_end_max = max(logs_end.lines, key=lambda x: x.id * (1 if x.used else 0))
-        logs_end_max_id = logs_end_max.id if logs_end_max is not None else None
-        if len(logs_end.lines) > 0:
+        if len(logs_end.lines) > 0 and logs_end.max_idx is not None:
+            logs_end_max_id = logs_end.lines[logs_end.max_idx].id
             print('\nLatest log id: %X' % logs_end_max_id)
             for msg in logs_end.lines:
+                if not msg.used:
+                    continue
                 if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id <= logs_start_max_id:
                     continue
                 op_str = 'N/A'
@@ -161,6 +165,8 @@ class App(Cmd):
 
                 print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
                       % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
+        else:
+            print('There are no logs on the card')
 
         return self.return_code(0)
 
