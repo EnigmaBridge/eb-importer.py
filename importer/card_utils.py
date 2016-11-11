@@ -45,7 +45,7 @@ def get_key_type(type_idx):
 
 
 def is_continue_status(sw):
-    return (sw & 0x6100) == 0x6100
+    return (sw >> 8) == 0x61
 
 
 def get_continue_bytes(sw):
