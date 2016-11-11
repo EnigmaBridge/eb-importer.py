@@ -522,9 +522,15 @@ class App(Cmd):
         # Dump continued data
         while cont_bytes is not None:
             res2, sw2 = self.send_continuation(cont_bytes)
-            cont_bytes = get_continue_bytes(sw2)
             resp += res2 if res2 is not None else []
             sw = sw2
+
+            if len(res2) != cont_bytes:
+                logger.error('Continuation protocol invalid, cont_bytes: %x, got: %x, sw: %x'
+                             % (cont_bytes, len(res2), sw2))
+                raise errors.InvalidResponse('Data continuation protocol invalid')
+
+            cont_bytes = get_continue_bytes(sw2)
 
         return resp, sw
 
