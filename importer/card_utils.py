@@ -18,6 +18,14 @@ from Crypto.Util.py3compat import *
 from Crypto.Util.number import long_to_bytes, bytes_to_long, size, ceil_div
 
 
+operation_logs = {
+    0x31:	'IMPORTCARD_INS_CARD_SETKEYSHARE     ',
+    0x32:   'IMPORTCARD_INS_CARD_CREATEUSEROBJECT',
+    0x33:   'IMPORTCARD_INS_CARD_ERASESHARES     ',
+    0x35:   'IMPORTCARD_INS_CARD_GETKEYSHARESINFO'
+}
+
+
 def format_data(data):
     str_res = ''
     for x in data:

@@ -106,20 +106,22 @@ class App(Cmd):
 
         # Get logs
         logs_start = self.get_logs()
-        logs_start_max = max(logs_start.lines, key=lambda x: x.id * (1 if x.used else 0))
-        logs_start_max_id = logs_start_max.id if logs_start_max is not None else None
+        logs_start_max_id = logs_start.max_idx
 
         # Show last N logs
         logs_to_show = logs_start.lines
         if len(logs_start.lines) > self.last_n_logs:
-            logs_to_show = logs_start.lines[(-1 * self.last_n_logs):]
+            logs_to_show = logs_start.lines[logs_start_max_id - self.last_n_logs - 1: logs_start_max_id+1]
 
         if len(logs_to_show) > 0:
-            print('Latest log id: %X' % logs_start_max_id)
             print('Last %d log lines: ' % self.last_n_logs)
             for msg in logs_to_show:
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+                op_str = 'N/A'
+                if msg.operation in operation_logs:
+                    op_str = operation_logs[msg.operation]
+
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
 
         # Show all shares
         shares_start = self.get_shares()
@@ -153,8 +155,12 @@ class App(Cmd):
             for msg in logs_end.lines:
                 if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id <= logs_start_max_id:
                     continue
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+                op_str = 'N/A'
+                if msg.operation in operation_logs:
+                    op_str = operation_logs[msg.operation]
+
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
 
         return self.return_code(0)
 
@@ -202,8 +208,12 @@ class App(Cmd):
         for msg in logs.lines:
             if not msg.used:
                 continue
-            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
-                  % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+            op_str = 'N/A'
+            if msg.operation in operation_logs:
+                op_str = operation_logs[msg.operation]
+
+            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
+                  % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
 
         return self.return_code(0)
 
