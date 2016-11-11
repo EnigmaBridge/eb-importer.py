@@ -9,7 +9,6 @@ import threading
 import socket
 import hashlib
 import traceback
-from datetime import datetime
 from smartcard.System import readers
 from smartcard.util import toHexString
 
@@ -31,7 +30,7 @@ def get_2bytes(data, offset=0):
 
 
 def get_key_types():
-    return ['AES', '3DES']
+    return ['AES-128', 'AES-192', 'AES-256', '3DES']
 
 
 def get_key_type(type_idx):

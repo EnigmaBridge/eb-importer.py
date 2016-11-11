@@ -53,6 +53,7 @@ class App(Cmd):
         self.core = Core()
         self.args = None
         self.last_result = 0
+        self.last_n_logs = 5
 
         self.noninteractive = False
         self.version = self.load_version()
@@ -91,43 +92,68 @@ class App(Cmd):
 
     def do_usage(self, line):
         """TODO: Writes simple usage hints"""
-        print('init   - TODO:fix')
         print('add    - adds a new key share')
         print('list   - lists all key shares')
         print('erase  - removes all key shares')
+        print('logs   - dumps card logs')
         print('usage  - writes this usage info')
-
-    def do_init(self, line):
-        """
-        test
-        """
-        if self.bootstrap() != 0:
-            return self.return_code(1)
-
-        print self.get_pubkey()
-
-        res, sw = self.transmit(toBytes('b631000026a900110011111111111111111111111111111111ad000f74657374206d6573736167653a2030'))
-        print(format_data(res), '%04X' % sw)
-
-        # res, sw = self.send_get_logs()
-        # print(format_data(res), '%04X' % sw)
-        #
-        # res, sw = self.send_get_shares()
-        # print(format_data(res), '%04X' % sw)
-
-        # Continue...
-        code, res, sw = self.add_share()
-        print(format_data(res), '%04X' % sw)
-        return self.return_code(0)
 
     def do_add(self, line):
         """Adds a new share to the card"""
         if self.bootstrap() != 0:
             return self.return_code(1)
 
-        code, res, sw = self.add_share()
+        # Get logs
+        logs_start = self.get_logs()
+        logs_start_max = max(logs_start.lines, key=lambda x: x.id * (1 if x.used else 0))
+        logs_start_max_id = logs_start_max.id if logs_start_max is not None else None
+
+        # Show last N logs
+        logs_to_show = logs_start.lines
+        if len(logs_start.lines) > self.last_n_logs:
+            logs_to_show = logs_start.lines[(-1 * self.last_n_logs):]
+
+        if len(logs_to_show) > 0:
+            print('Latest log id: %X' % logs_start_max_id)
+            print('Last %d log lines: ' % self.last_n_logs)
+            for msg in logs_to_show:
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+
+        # Show all shares
+        shares_start = self.get_shares()
+        free_shares = []
+        for idx, share in enumerate(shares_start):
+            if not share.used:
+                free_shares.append(idx+1)
+            self.dump_share(idx, share)
+
+        if len(free_shares) == 0:
+            print(self.t.red('Cannot add a new share, all are set'))
+            return self.return_code(1)
+
+        # Add a new share
+        code, res, sw = self.add_share(free_shares=free_shares)
         if code == 0:
             print(self.t.green('New share added successfully!'))
+
+        # Dump shares again
+        shares_end = self.get_shares()
+        for idx, share in enumerate(shares_end):
+            self.dump_share(idx, share)
+
+        # Logs since last dump
+        logs_end = self.get_logs()
+        logs_end_max = max(logs_end.lines, key=lambda x: x.id * (1 if x.used else 0))
+        logs_end_max_id = logs_end_max.id if logs_end_max is not None else None
+        if len(logs_end.lines) > 0:
+            print('\nLatest log id: %X' % logs_end_max_id)
+            for msg in logs_end.lines:
+                if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id < logs_start_max_id:
+                    continue
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
+
         return self.return_code(0)
 
     def do_list(self, line):
@@ -137,18 +163,7 @@ class App(Cmd):
 
         shares = self.get_shares()
         for idx, share in enumerate(shares):
-            print('\nShare idx %d: ' % (idx+1))
-            if not share.used:
-                print(' - EMPTY')
-                continue
-
-            type_str = get_key_type(share.key_type)
-            print(' - Type: %s' % (type_str if type_str is not None else '?'))
-            print(' - Used: %s' % share.used)
-            print(' - Share length: %d' % share.share_len)
-            print(' - KCV1: %04X' % share.kcv1)
-            print(' - KCV2: %04X' % share.kcv2)
-            print(' - Message: %s' % share.message_str)
+            self.dump_share(idx, share)
         print('')
 
     def do_erase(self, line):
@@ -187,7 +202,7 @@ class App(Cmd):
                 continue
             print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X, Share: %d, uoid: %08X'
                   % (msg.status, msg.id, msg.len, msg.operation, msg.share_id, msg.uoid))
-        
+
         return self.return_code(0)
 
     def bootstrap(self):
@@ -200,20 +215,46 @@ class App(Cmd):
         self.select_importcard()
         return self.return_code(0)
 
-    def add_share(self, share_idx=None):
+    def dump_share(self, idx, share):
+        print('\nShare idx %d: ' % (idx+1))
+        if not share.used:
+            print(' - EMPTY')
+            return
+
+        type_str = get_key_type(share.key_type)
+        print(' - Type: %s' % (type_str if type_str is not None else '?'))
+        print(' - Used: %s' % share.used)
+        print(' - Share length: %d' % share.share_len)
+        print(' - KCV1: %04X' % share.kcv1)
+        print(' - KCV2: %04X' % share.kcv2)
+        print(' - Message: %s' % share.message_str)
+
+    def add_share(self, share_idx=None, free_shares=None):
         # Enter key share
         key_types = get_key_types()
         key_type, key_share, key_share_bin, key_share_arr, kcv = None, None, None, None, None
 
         print('\nAdd new key share procedure started\n')
 
+        # Last share left
+        if share_idx is None and free_shares is not None and len(free_shares) == 1:
+            if not self.ask_proceed('The last share %d is about to set, is that correct? (y/n): ' % free_shares[0]):
+                return self.return_code(1)
+            share_idx = free_shares[0]
+
         # Ask for share idx
         if share_idx is None:
             print('Please, pick the key share index you are going to add:')
             while True:
                 try:
-                    share_idx = int(raw_input('Key share (1/2/3): ').strip())
+                    share_list = '1/2/3'
+                    if free_shares is not None:
+                        share_list = '/'.join([str(x) for x in free_shares])
+
+                    share_idx = int(raw_input('Key share (%s): ' % share_list).strip())
                     if share_idx <= 0 or share_idx > 3:
+                        continue
+                    if free_shares is not None and share_idx not in free_shares:
                         continue
                     break
                 except Exception as e:
@@ -238,9 +279,18 @@ class App(Cmd):
                 key_share = key_share.replace(' ', '')
                 key_share_bin = base64.b16decode(key_share)
                 key_share_arr = toBytes(key_share)
-                if key_type == 0:
+                if key_type == 'AES-128' and len(key_share_arr) != 16:
+                    raise ValueError('AES-128 needs 16B key')
+                if key_type == 'AES-192' and len(key_share_arr) != 24:
+                    raise ValueError('AES-192 needs 24B key')
+                if key_type == 'AES-256' and len(key_share_arr) != 32:
+                    raise ValueError('AES-256 needs 32B key')
+                if key_type == '3DES' and len(key_share_arr) != 32 and len(key_share_arr) != 21:
+                    raise ValueError('3DES key length invalid')
+
+                if key_type <= 2:
                     kcv = utils.compute_kcv_aes(key_share_bin)
-                elif key_type == 1:
+                elif key_type == 3:
                     kcv = utils.compute_kcv_3des(key_share_bin)
                 else:
                     raise ValueError('Unknown key type, cannot compute KCV')
@@ -273,7 +323,7 @@ class App(Cmd):
             # Key ID
             key_id = raw_input(' - Key ID (10 chars max): ').strip()
             if len(key_id) > 10:
-                key_id = key_id[0:10]
+                key_id = key_id[0:9]
 
             print('\nDate: %d/%d/%d, key ID: %s' % (dt[0], dt[1], dt[2], key_id))
             ok = self.ask_proceed('Is this correct? (y/n): ')
@@ -583,7 +633,7 @@ class App(Cmd):
 
             # Date test
             try:
-                tt = datetime.date(2000+yy, mm, dd)
+                tt = datetime.datetime(year=2000+yy, month=mm, day=dd)
             except Exception as ex:
                 logger.error('Date format is not valid: %s' % ex)
                 continue
