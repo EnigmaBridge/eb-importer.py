@@ -87,6 +87,9 @@ class App(Cmd):
         self.intro = '-'*self.get_term_width() + \
                      ('\n    Enigma Bridge Key Importer command line interface (v%s) \n' % self.version) + \
                      '\n    add   - adds a new key share' + \
+                     '\n    list  - lists all key shares' + \
+                     '\n    erase - removes all key shares' + \
+                     '\n    logs  - dumps card logs' + \
                      '\n    usage - shows simple command list'
 
         self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
