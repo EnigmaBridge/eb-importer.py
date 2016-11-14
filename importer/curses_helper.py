@@ -74,7 +74,11 @@ class KeyBox(object):
         win.keypad(1)
 
     def goto_last(self):
-        """Moves to the last position"""
+        """
+        Moves cursor to the last position.
+
+        :return:
+        """
         try:
             self.win.move(self.last_y, self.last_x)
         except:
@@ -94,7 +98,15 @@ class KeyBox(object):
         return last
 
     def _translate(self, y, x, cur_y=None, cur_x=None):
-        """Position overlay - for auto-formatting"""
+        """
+        Position overlay - for auto-formatting
+
+        :param y:
+        :param x:
+        :param cur_y:
+        :param cur_x:
+        :return:
+        """
         if not self.auto_format:
             return y, x
 
@@ -120,13 +132,20 @@ class KeyBox(object):
         return max(y, 0), max(0, x)
 
     def _add_char(self, y, x, ch):
-        """Prints character to the terminal, hiding the original user input"""
+        """
+        Prints character to the terminal, hiding the original user input.
+
+        :param y:
+        :param x:
+        :param ch:
+        :return:
+        """
         if curses.ascii.isprint(ch):
             orig_y, orig_x = y, x
             y, x = self._translate(y, x)
 
             # Store the original character to the appropriate buffer position
-            # Initialize buffer with spaces / delim
+            # Initialize buffer with spaces.
             while len(self.buffer) <= x:
                 self.buffer.append(curses.ascii.SP)
             self.buffer[x] = ch
@@ -142,6 +161,12 @@ class KeyBox(object):
         return self.win.getyx()
 
     def _inch(self, *args):
+        """
+        Getting character at the given position.
+
+        :param args:
+        :return:
+        """
         y, x = self._getyx()
         if len(args) == 2:
             y, x = args
@@ -157,6 +182,14 @@ class KeyBox(object):
             return curses.ascii.SP
 
     def _move(self, y, x):
+        """
+        Move with taking internal position mapping into account.
+        Remembering the last position of the moved cursor.
+
+        :param y:
+        :param x:
+        :return:
+        """
         cur_y, cur_x = self.win.getyx()
         y, x = self._translate(y, x, cur_y, cur_x)
         try:
@@ -169,10 +202,17 @@ class KeyBox(object):
             return None
 
     def _delch(self, y, x):
-        cur_y, cur_x = self.win.getyx()
-        cur_x+=2
+        """
+        Deleting a character at given position.
+        Reimplemented because of the internal buffering and character hiding, auto-formatting
 
-        # cur_y, cur_x = None, None
+        :param y:
+        :param x:
+        :return:
+        """
+        cur_y, cur_x = self.win.getyx()
+        cur_x += 2
+
         x -= 1
         y, x = self._translate(y, x, cur_y, cur_x)
 
@@ -185,7 +225,7 @@ class KeyBox(object):
         if not self.auto_format:
             return
 
-        # Fix vuffer spaces re-alignment, move space to 1 to the right
+        # Fix buffer spaces re-alignment, move space to 1 to the right
         # Buffer contains input string also with spaces.
         ln = len(self.buffer)
         i = x
