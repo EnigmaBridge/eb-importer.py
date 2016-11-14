@@ -257,16 +257,21 @@ class Logs(object):
             tmp_lines = self.lines
             ln = len(tmp_lines)
 
-            # find minimum such that diff to the next is not bigger than 0x7fff / 4
-            min_id_idx = 0
-            for idx in range(1, ln):
-                diff = tmp_lines[idx].id - tmp_lines[idx-1].id
-                if tmp_lines[min_id_idx].id > tmp_lines[idx].id and diff < (0x7FFFl/4L):
-                    min_id_idx = idx
+            # Finding the oldest log record
+            # overflow happened? if max(x) - min(x) >= 0x7fff/2 (take also round robin into account)
+            overflow_happened = (max(tmp_lines, key=lambda x: x.id).id
+                                 - min(tmp_lines, key=lambda x: x.id).id) > 0x7fffL/2
+            if overflow_happened:
+                # If overflow - find the lowes from the high numbers.
+                min_id_idx = min([x for x in range(ln) if tmp_lines[x].id >= 0x7fffL], key=lambda x: tmp_lines[x].id)
+            else:
+                # No overflow - find index with minimal ID
+                min_id_idx = min(range(ln), key=lambda x: tmp_lines[x].id)
 
             self.lines = [tmp_lines[min_id_idx]]
             idx = min_id_idx + 1
 
+            # Read from the minimum element - so the sorting from oldest to newest (also with overflow) is fixed
             while idx != min_id_idx:
                 self.lines.append(tmp_lines[idx])
                 idx = (idx + 1) % ln
@@ -294,12 +299,11 @@ class Logs(object):
                 continue
 
             diff = abs(lines[idx+1].id - lines[idx].id)
-            if diff >= 0x7fffL:
+            if diff >= 0x7fffL/2:
                 offset += 0x10000L
                 clog.id -= offset
 
         self.was_sorted = True
-        # self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
 
     def __repr__(self):
         return 'Logs{entries: %s, overflows: 0x%x, lines: %s, signature: %s}' \
