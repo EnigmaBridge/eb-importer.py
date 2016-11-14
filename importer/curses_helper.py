@@ -204,7 +204,7 @@ class KeyBox(object):
         self.win.move(y, x)
         for i in range(x, ln):
             c = self.buffer[i]
-            if c != curses.ascii.SP:
+            if self.hide_input and c != curses.ascii.SP:
                 c = self.placeholder
             self.win.addch(c)
         self.win.move(y, x)
