@@ -382,7 +382,9 @@ class App(Cmd):
         print('\nSummary of the key to import:')
         print(' - Share index: %d' % share_idx)
         print(' - Key type: %s' % key_type.name)
-        print(' - Key: %s\n - KVC: %s' % (format_data(key_share_arr), format_data(kcv[0:3])))
+        if not self.hide_key:
+            print(' - Key: %s' % (format_data(key_share_arr)))
+        print(' - KVC: %s' % (format_data(kcv[0:3])))
         print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
         print(' - Text descriptor: %s' % txt_desc)
