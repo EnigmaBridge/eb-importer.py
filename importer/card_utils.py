@@ -257,9 +257,15 @@ class Logs(object):
             tmp_lines = self.lines
             ln = len(tmp_lines)
 
-            min_id_idx = min(range(ln), key=lambda x: tmp_lines[x].id)
-            idx = min_id_idx + 1
+            # find minimum such that diff to the next is not bigger than 0x7fff / 4
+            min_id_idx = 0
+            for idx in range(1, ln):
+                diff = tmp_lines[idx].id - tmp_lines[idx-1].id
+                if tmp_lines[min_id_idx].id > tmp_lines[idx].id and diff < (0x7FFFl/4L):
+                    min_id_idx = idx
+
             self.lines = [tmp_lines[min_id_idx]]
+            idx = min_id_idx + 1
 
             while idx != min_id_idx:
                 self.lines.append(tmp_lines[idx])
@@ -293,9 +299,6 @@ class Logs(object):
                 clog.id -= offset
 
         self.was_sorted = True
-        for x in self.lines:
-            logger.info(' - %s' % x)
-
         # self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
 
     def __repr__(self):
