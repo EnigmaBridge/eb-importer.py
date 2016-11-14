@@ -17,7 +17,7 @@ install_requires = [
     'blessed>=1.14.1',
     'future',
     'coloredlogs',
-    'pyscard'
+    'pyscard>=1.6.14'
 ]
 
 # env markers in extras_require cause problems with older pip: #517
