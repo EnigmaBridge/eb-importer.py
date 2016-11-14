@@ -1,15 +1,11 @@
 #!/usr/bin/python -u
 import time
-import shlex
 import os
 import sys
 import types
 import utils
 import base64
 import math
-import subprocess
-import threading
-import socket
 import hashlib
 import traceback
 import logging

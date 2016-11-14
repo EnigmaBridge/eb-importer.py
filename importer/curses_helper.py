@@ -1,11 +1,6 @@
 from __future__ import division, print_function
 import curses
 import curses.ascii
-import sys
-import os
-import time
-import functools
-from blessed import Terminal
 import logging
 
 
