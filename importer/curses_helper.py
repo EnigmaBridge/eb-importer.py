@@ -129,6 +129,8 @@ class KeyBox(object):
             if x > 0 and ((x+1) % (self.auto_format_block_size+1)) == 0:
                 x -= 1
 
+        y = min(y, self.maxy)
+        x = min(x, self.maxx)
         return max(y, 0), max(0, x)
 
     def _add_char(self, y, x, ch):
@@ -198,7 +200,7 @@ class KeyBox(object):
             self.last_y = y
             return res
         except Exception as e:
-            logger.error('Error move %d %d %s' % (y,x,e))
+            logger.error('Error move %d %d %s' % (y, x, e))
             return None
 
     def _delch(self, y, x):
@@ -268,7 +270,10 @@ class KeyBox(object):
                 (backy, backx) = self._getyx()
                 if curses.ascii.isprint(oldch):
                     self._insert_printable_char(oldch)
-                    self._move(backy, backx)
+                    if backy <= self.maxy and backx <= self.maxx:
+                        self._move(backy, backx)
+                    else:
+                        logger.warning('Out of bounds: %d %d max %d %d' % (y,x, self.maxy, self.maxx))
 
     def do_command(self, ch):
         "Process a single editing command."
