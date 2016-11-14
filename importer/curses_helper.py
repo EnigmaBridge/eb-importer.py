@@ -334,8 +334,22 @@ class KeyBox(object):
 
 
 class curses_screen(object):
+    def __init__(self):
+        self.red_pair = None
+        pass
+
+    def get_red_attr(self):
+        if self.red_pair is None:
+            self.red_pair = 10
+            curses.init_pair(self.red_pair, curses.COLOR_RED, -1)
+
+        red_attr = curses.color_pair(self.red_pair) | curses.A_NORMAL
+        return red_attr
+
     def __enter__(self):
         self.stdscr = curses.initscr()
+        curses.start_color()
+        curses.use_default_colors()
         curses.cbreak()
         curses.noecho()
         self.stdscr.keypad(1)

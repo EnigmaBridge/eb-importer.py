@@ -703,7 +703,9 @@ class App(Cmd):
 
         key_share = None
         hex_alphabet = [ord(x) for x in '0123456789abcdefABCDEF']
-        with curses_screen() as win:
+        screen_wrapper = curses_screen()
+
+        with screen_wrapper as win:
             y, x = win.getyx()
             win.addstr(0, 0, prompt)
             win.refresh()
@@ -742,15 +744,19 @@ class App(Cmd):
                 if ch == curses.ascii.NL and key_type is not None:
                     tmp_share = (''.join([chr(x) for x in keybox.buffer]))
                     tmp_share = tmp_share.strip().upper().replace(' ', '')
-                    tmp_share = key_type.process_key(tmp_share)
+                    try:
+                        tmp_share = key_type.process_key(tmp_share)
+                    except:
+                        pass
+
                     if len(tmp_share) != key_len*2:
                         try:
-                            win.addstr(err_y, err_x, 'Error: key size is invalid')
-                            keybox.goto_last()
+                            win.addstr(err_y, err_x, 'Error: key size is invalid', screen_wrapper.get_red_attr())
                             win.refresh()
+                            keybox.goto_last()
                             error_shown = True
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.error('curses error exception: %s' % e)
                         continue
 
                 if not keybox.do_command(ch):
