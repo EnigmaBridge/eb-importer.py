@@ -17,6 +17,7 @@ install_requires = [
     'blessed>=1.14.1',
     'future',
     'coloredlogs',
+    'humanfriendly>=2.1',
     'pyscard>=1.6.14'
 ]
 
