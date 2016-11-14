@@ -12,10 +12,14 @@ import threading
 import socket
 import hashlib
 import traceback
+import logging
 from smartcard.System import readers
 from smartcard.util import toHexString
 from Crypto.Util.py3compat import *
 from Crypto.Util.number import long_to_bytes, bytes_to_long, size, ceil_div
+
+
+logger = logging.getLogger(__name__)
 
 
 operation_logs = {
@@ -241,7 +245,27 @@ class Logs(object):
         """
 
         # Overflows total ID computation.
-        # The last used log entry is the latest.
+        # The last used log entry is not the latest - round robin buffering is used.
+        all_used = True
+        for x in self.lines:
+            if not x.used:
+                all_used = False
+                break
+
+        # If all log lines are used - find the minimum index and start looping from there
+        if all_used:
+            tmp_lines = self.lines
+            ln = len(tmp_lines)
+
+            min_id_idx = min(range(ln), key=lambda x: tmp_lines[x].id)
+            idx = min_id_idx + 1
+            self.lines = [tmp_lines[min_id_idx]]
+
+            while idx != min_id_idx:
+                self.lines.append(tmp_lines[idx])
+                idx = (idx + 1) % ln
+            pass
+
         # Scan logs in DESC ordering, if there is a big shift compared to the previous ID,
         # overflow happened. Overflow is up-to-date for the last record only. Fot others it has to
         # be recomputed.
@@ -269,6 +293,9 @@ class Logs(object):
                 clog.id -= offset
 
         self.was_sorted = True
+        for x in self.lines:
+            logger.info(' - %s' % x)
+
         # self.lines = sorted(self.lines, key=lambda x: x.id, reverse=False)
 
     def __repr__(self):
