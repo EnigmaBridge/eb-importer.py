@@ -7,7 +7,7 @@ from datetime import datetime
 class Core(object):
     def __init__(self, *args, **kwargs):
         """Init the core functions"""
-        self.pidlock = pid.PidFile(pidname='enigma-importer.pid', piddir='/var/run')
+        self.pidlock = pid.PidFile(pidname='enigma-importer.pid', piddir='/tmp')
         self.pidlock_created = False
 
     def pidlock_create(self):
