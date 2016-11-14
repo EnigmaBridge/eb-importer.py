@@ -15,23 +15,6 @@ logger = logging.getLogger(__name__)
 __author__ = 'dusanklinec'
 
 
-# python 2/3 compatibility, provide 'echo' function as an
-# alias for "print without newline and flush"
-try:
-    # pylint: disable=invalid-name
-    #         Invalid constant name "echo"
-    echo = functools.partial(print, end='', flush=True)
-    echo(u'')
-except TypeError:
-    # TypeError: 'flush' is an invalid keyword argument for this function
-    import sys
-
-    def echo(text):
-        """Display ``text`` and flush output."""
-        sys.stdout.write(u'{}'.format(text))
-        sys.stdout.flush()
-
-
 class KeyBox(object):
     """Editing widget using the interior of a window object.
      Supports the following Emacs-like key bindings:
