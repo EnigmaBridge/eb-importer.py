@@ -59,6 +59,7 @@ class App(Cmd):
 
         self.noninteractive = False
         self.version = self.load_version()
+        self.hide_key = True
 
         self.t = Terminal()
         self.update_intro()
@@ -323,14 +324,24 @@ class App(Cmd):
 
                 print('\n')
                 if key_share_fix != key_share and len(key_share_fix) != len(key_share):
-                    print('Entered key was augmented with parity bits, Original key: \n  %s'
-                          % format_data(toBytes(key_share)))
+                    if self.hide_key:
+                        print('Entered key was augmented with parity bits')
+                    else:
+                        print('Entered key was augmented with parity bits, Original key: \n  %s'
+                              % format_data(toBytes(key_share)))
                 elif key_share_fix != key_share:
-                    print('Entered key had invalid parity bits, Original key: \n  %s'
-                          % format_data(toBytes(key_share)))
+                    if self.hide_key:
+                        print('Entered key had invalid parity bits')
+                    else:
+                        print('Entered key had invalid parity bits, Original key: \n  %s'
+                              % format_data(toBytes(key_share)))
 
-                print('The following key share will be imported: \n  %s\n  KVC: %s\n'
-                      % (format_data(key_share_arr), format_data(kcv[0:3])))
+                if self.hide_key:
+                    print('The following key share will be imported: \n  KVC: %s\n'
+                          % (format_data(kcv[0:3])))
+                else:
+                    print('The following key share will be imported: \n  %s\n  KVC: %s\n'
+                          % (format_data(key_share_arr), format_data(kcv[0:3])))
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
                 if ok == self.PROCEED_QUIT:
@@ -691,6 +702,9 @@ class App(Cmd):
         pass
 
     def ask_keyshare(self, prompt=None, key_type=None):
+        """Prompts for the key share - supports hidden entering mode, actual key share values
+        are replaced by placeholders"""
+
         if prompt is None:
             prompt = 'Now please enter your key share in hex-coded form: \n'
 
@@ -703,10 +717,11 @@ class App(Cmd):
 
         key_share = None
         hex_alphabet = [ord(x) for x in '0123456789abcdefABCDEF']
+        err_y, err_x = 5, 2
         screen_wrapper = curses_screen()
 
+        # initializes curses for dialog
         with screen_wrapper as win:
-            y, x = win.getyx()
             win.addstr(0, 0, prompt)
             win.refresh()
 
@@ -716,10 +731,11 @@ class App(Cmd):
             if key_len is not None:
                 win_width = int(2*key_len + math.ceil(2*key_len / 4))
 
-            err_y, err_x = 5, 2
-
             win_key = curses.newwin(1, win_width, 3, min(4, max(0, 80-win_width)))
             keybox = KeyBox(win_key, True)
+
+            if not self.hide_key:
+                keybox.hide_input = False
 
             # editing routine
             error_shown = False
