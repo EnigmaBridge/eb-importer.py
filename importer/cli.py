@@ -21,7 +21,9 @@ from pkg_resources import get_distribution, DistributionNotFound
 from smartcard.System import readers
 from smartcard.util import toHexString, toBytes
 import logging, coloredlogs
-
+from curses_helper import KeyBox, curses_screen
+import curses
+import curses.ascii
 
 logger = logging.getLogger(__name__)
 coloredlogs.install()
@@ -284,7 +286,7 @@ class App(Cmd):
                     if free_shares is not None:
                         share_list = '/'.join([str(x) for x in free_shares])
 
-                    share_idx = int(raw_input('Key share (%s): ' % share_list).strip())
+                    share_idx = int(raw_input('Key share index (%s): ' % share_list).strip())
                     if share_idx <= 0 or share_idx > 3:
                         continue
                     if free_shares is not None and share_idx not in free_shares:
@@ -309,9 +311,8 @@ class App(Cmd):
         while True:
             try:
                 question = 'Now please enter your key share in hex-coded form: \n'
-                key_share = raw_input(question).strip().upper()
-                key_share = key_share.replace(' ', '')
-                key_share_fix = key_type.process_key(key_share)
+                key_share, key_share_fix = self.ask_keyshare(question, key_type=key_type)
+
                 key_share_bin = base64.b16decode(key_share_fix)
                 key_share_arr = toBytes(key_share_fix)
 
@@ -688,6 +689,82 @@ class App(Cmd):
             if ok:
                 return dt
         pass
+
+    def ask_keyshare(self, prompt=None, key_type=None):
+        if prompt is None:
+            prompt = 'Now please enter your key share in hex-coded form: \n'
+
+        # old way:
+        # key_share = raw_input(question).strip().upper()
+
+        key_len = None
+        if key_type is not None:
+            key_len = key_type.key_len
+
+        key_share = None
+        hex_alphabet = [ord(x) for x in '0123456789abcdefABCDEF']
+        with curses_screen() as win:
+            y, x = win.getyx()
+            win.addstr(0, 0, prompt)
+            win.refresh()
+
+            # Create window just for the key entry.
+            # if key length is given - compute number of characters needed.
+            win_width = 78
+            if key_len is not None:
+                win_width = int(2*key_len + math.ceil(2*key_len / 4))
+
+            err_y, err_x = 5, 2
+
+            win_key = curses.newwin(1, win_width, 3, min(4, max(0, 80-win_width)))
+            keybox = KeyBox(win_key, True)
+
+            # editing routine
+            error_shown = False
+            while 1:
+                ch = keybox.win.getch()
+                if not ch:
+                    continue
+
+                # Clear old error
+                if error_shown:
+                    win.move(err_y, err_x)
+                    win.clrtoeol()
+                    win.refresh()
+                    keybox.goto_last()
+                    error_shown = False
+
+                # Allow only hex characters
+                if curses.ascii.isprint(ch) and ch not in hex_alphabet:
+                    continue
+
+                # Allow finishing only if entering all characters
+                if ch == curses.ascii.NL and key_type is not None:
+                    tmp_share = (''.join([chr(x) for x in keybox.buffer]))
+                    tmp_share = tmp_share.strip().upper().replace(' ', '')
+                    tmp_share = key_type.process_key(tmp_share)
+                    if len(tmp_share) != key_len*2:
+                        try:
+                            win.addstr(err_y, err_x, 'Error: key size is invalid')
+                            keybox.goto_last()
+                            win.refresh()
+                            error_shown = True
+                        except:
+                            pass
+                        continue
+
+                if not keybox.do_command(ch):
+                    break
+
+                keybox.win.refresh()
+
+            key_share = (''.join([chr(x) for x in keybox.buffer]))
+            key_share = key_share.strip().upper().replace(' ', '')
+            key_share_fix = key_share
+            if key_type is not None:
+                key_share_fix = key_type.process_key(key_share)
+
+        return key_share, key_share_fix
 
     def check_root(self):
         """Checks if the script was started with root - we need that for file ops :/"""
