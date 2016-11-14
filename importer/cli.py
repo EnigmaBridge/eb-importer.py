@@ -58,7 +58,7 @@ class App(Cmd):
         self.last_n_logs = 5
 
         self.noninteractive = False
-        self.version = self.load_version()
+        self.version = 'Latest'
         self.hide_key = True
         self.root_required = False
 
@@ -96,6 +96,7 @@ class App(Cmd):
                       '-'*self.get_term_width()
 
     def do_version(self, line):
+        self.version = self.load_version()
         print('%s-%s' % (self.PIP_NAME, self.version))
 
     def do_usage(self, line):
