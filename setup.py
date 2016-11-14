@@ -74,5 +74,11 @@ setup(
     extras_require={
         'dev': dev_extras,
         'docs': docs_extras,
+    },
+
+    entry_points={
+        'console_scripts': [
+            'ebimport = importer.cli:main',
+        ],
     }
 )
