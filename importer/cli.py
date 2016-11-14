@@ -60,6 +60,7 @@ class App(Cmd):
         self.noninteractive = False
         self.version = self.load_version()
         self.hide_key = True
+        self.root_required = False
 
         self.t = Terminal()
         self.update_intro()
@@ -792,6 +793,9 @@ class App(Cmd):
 
     def check_root(self):
         """Checks if the script was started with root - we need that for file ops :/"""
+        if not self.root_required:
+            return True
+        
         uid = os.getuid()
         euid = os.geteuid()
         if uid != 0 and euid != 0:
