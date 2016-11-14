@@ -229,30 +229,46 @@ class KeyBox(object):
 
         # Fix buffer spaces re-alignment, move space to 1 to the right
         # Buffer contains input string also with spaces.
-        ln = len(self.buffer)
-        i = x
-        while i < ln-1:
-            c = self.buffer[i]
-            if c == curses.ascii.SP:
-                n = self.buffer[i+1]
-                self.buffer[i] = n
-                self.buffer[i+1] = c
-                i += 1
-            i += 1
-        pass
+        self._move_delim(x)
 
         # Raw repainting from the buffer
         # Buffer contains spaces also, thus can be rerendered without coordinate remapping
         self.win.move(y, x)
+        self._redraw_buff(x)
+        self.win.move(y, x)
+        pass
+
+    def _move_delim(self, x, to_right=True):
+        # Fix buffer spaces re-alignment, move space to 1 to the right
+        # Buffer contains input string also with spaces.
+        ln = len(self.buffer)
+        i = x
+
+        loop_end = ln-1
+        if not to_right:
+            i += 1
+            loop_end = ln
+
+        while i < loop_end:
+            c = self.buffer[i]
+            if c == curses.ascii.SP:
+                n = self.buffer[i+1 if to_right else i-1]
+                self.buffer[i] = n
+                self.buffer[i+1 if to_right else i-1] = c
+                if to_right:
+                    i += 1
+            i += 1
+        pass
+
+    def _redraw_buff(self, x=0):
+        ln = len(self.buffer)
         for i in range(x, ln):
             c = self.buffer[i]
             if self.hide_input and c != curses.ascii.SP:
                 c = self.placeholder
             self.win.addch(c)
-        self.win.move(y, x)
-        pass
 
-    def _insert_printable_char(self, ch, from_user=False, skip_add=False):
+    def _insert_printable_char(self, ch, from_user=False):
         (y, x) = self._getyx()
         if y < self.maxy or x < self.maxx:
             if self.insert_mode:
@@ -261,8 +277,7 @@ class KeyBox(object):
             # versions by trying to write into the lowest-rightmost spot
             # in the window.
             try:
-                if not skip_add:
-                    self._add_char(y, x, ch)
+                self._add_char(y, x, ch)
             except curses.error:
                 pass
             if self.insert_mode:
