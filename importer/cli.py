@@ -193,6 +193,7 @@ class App(Cmd):
             return self.return_code(1)
 
         # Warning
+        print('')
         print(self.t.underline_red('! WARNING !'))
         print('This is a destructive operation, all shares will be unrecoverably deleted from the card')
         if not self.ask_proceed('Do you really want to remove all key shares? (y/n): ', support_non_interactive=True):
@@ -214,7 +215,7 @@ class App(Cmd):
 
         # Dump logs
         logs = self.get_logs()
-        print('Log entries: 0x%x' % logs.max_id)
+        print('\nLog entries: 0x%x' % logs.max_id)
         print('Log lines:')
 
         for msg in logs.lines:
@@ -230,7 +231,7 @@ class App(Cmd):
         key = self.get_pubkey()
         key_fmted = self.format_pubkey(key)
 
-        print('Card ID: %s' % key_fmted)
+        print('\nCard ID: %s' % key_fmted)
         return self.return_code(0)
 
     def do_importkey(self, line):
@@ -240,7 +241,7 @@ class App(Cmd):
         key = self.get_seed_pubkey()
         key_fmted = self.format_pubkey(key)
 
-        print('ImportKey: %s' % key_fmted)
+        print('\nImportKey: %s' % key_fmted)
         return self.return_code(0)
 
     def format_pubkey(self, pubkey):
