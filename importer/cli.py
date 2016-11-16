@@ -25,14 +25,9 @@ from curses_helper import KeyBox, curses_screen
 import curses
 import curses.ascii
 
+
 logger = logging.getLogger(__name__)
 coloredlogs.install()
-
-# logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-# rootLogger = logging.getLogger()
-# consoleHandler = logging.StreamHandler()
-# consoleHandler.setFormatter(logFormatter)
-# rootLogger.addHandler(consoleHandler)
 
 
 class App(Cmd):
