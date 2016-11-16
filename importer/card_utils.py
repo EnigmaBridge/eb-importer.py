@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 operation_logs = {
-    0x31:	'IMPORTCARD_INS_CARD_SETKEYSHARE     ',
-    0x32:   'IMPORTCARD_INS_CARD_CREATEUSEROBJECT',
-    0x33:   'IMPORTCARD_INS_CARD_ERASESHARES     ',
-    0x35:   'IMPORTCARD_INS_CARD_GETKEYSHARESINFO'
+    0x31:	'SET KEY SHARE      ',
+    0x32:   'CREATE USER OBJECT ',
+    0x33:   'ERASE SHARES       ',
+    0x35:   'GET KEY SHARES INFO'
 }
 
 
