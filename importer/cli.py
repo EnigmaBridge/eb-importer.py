@@ -309,6 +309,7 @@ class App(Cmd):
         return ':'.join(res)
 
     def bootstrap(self):
+        """Initialization routine, checks system preconditions, pid lock, card load"""
         if not self.check_root() or not self.check_pid():
             return self.return_code(1)
 
@@ -792,26 +793,20 @@ class App(Cmd):
         parser.add_argument('--verbose', dest='verbose', action='store_const', const=True,
                             help='enables verbose mode')
         parser.add_argument('--force', dest='force', action='store_const', const=True, default=False,
-                            help='forces some action (e.g., certificate renewal)')
+                            help='forces some action')
 
-        parser.add_argument('--email', dest='email', default=None,
-                            help='email address to use instead of prompting for one')
+        parser.add_argument('--show-key', dest='show_key', action='store_const', const=True, default=False,
+                            help='shows the key during add key share entry')
 
         parser.add_argument('--yes', dest='yes', action='store_const', const=True,
                             help='answers yes to the questions in the non-interactive mode, mainly for init')
-
-        parser.add_argument('--allow-update', action='store_const', const=True,
-                            help='Inherited option from auto-update wrapper, no action here')
-        parser.add_argument('--no-self-upgrade', action='store_const', const=True,
-                            help='Inherited option from auto-update wrapper, no action here')
-        parser.add_argument('--os-packages-only', action='store_const', const=True,
-                            help='Inherited option from auto-update wrapper, no action here')
 
         parser.add_argument('commands', nargs=argparse.ZERO_OR_MORE, default=[],
                             help='commands to process')
 
         self.args = parser.parse_args(args=args_src[1:])
         self.noninteractive = self.args.noninteractive
+        self.hide_key = not self.args.show_key
 
         # Fixing cmd2 arg parsing, call cmdLoop
         sys.argv = [args_src[0]]
