@@ -97,11 +97,12 @@ class App(Cmd):
                       '-'*self.get_term_width()
 
     def do_version(self, line):
+        """Shows the version of the key importer"""
         self.version = self.load_version()
         print('%s-%s' % (self.PIP_NAME, self.version))
 
     def do_usage(self, line):
-        """TODO: Writes simple usage hints"""
+        """Shows basic commands"""
         print('add    - adds a new key share')
         print('list   - lists all key shares')
         print('erase  - removes all key shares')
@@ -188,7 +189,7 @@ class App(Cmd):
         print('')
 
     def do_erase(self, line):
-        """Deletes all shares present"""
+        """Deletes all shares from the card"""
         if self.bootstrap() != 0:
             return self.return_code(1, True)
 
@@ -235,6 +236,7 @@ class App(Cmd):
         return self.return_code(0)
 
     def do_importkey(self, line):
+        """Prints card import key"""
         if self.bootstrap() != 0:
             return self.return_code(1, True)
 
