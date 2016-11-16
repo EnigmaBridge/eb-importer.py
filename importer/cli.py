@@ -131,8 +131,8 @@ class App(Cmd):
                 if msg.operation in operation_logs:
                     op_str = operation_logs[msg.operation]
 
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
         else:
             print('There are no logs on the card')
 
@@ -173,8 +173,8 @@ class App(Cmd):
                 if msg.operation in operation_logs:
                     op_str = operation_logs[msg.operation]
 
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
+                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
+                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
         else:
             print('There are no logs on the card')
 
@@ -228,8 +228,8 @@ class App(Cmd):
             if msg.operation in operation_logs:
                 op_str = operation_logs[msg.operation]
 
-            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, uoid: %08X'
-                  % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
+            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
+                  % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
 
         return self.return_code(0)
 

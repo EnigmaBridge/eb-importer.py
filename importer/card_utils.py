@@ -320,7 +320,7 @@ class LogLine(object):
         self.len = None
         self.operation = None
         self.share_id = None
-        self.uoid = None
+        self.data = None
 
     def parse_line(self, data, logs=None):
         """
@@ -340,14 +340,14 @@ class LogLine(object):
         self.len = get_2bytes(data, 5)
         self.operation = data[7]
         self.share_id = data[8]
-        self.uoid = (get_2bytes(data, 9) << 16) | get_2bytes(data, 11)
+        self.data = (get_2bytes(data, 9) << 16) | get_2bytes(data, 11)
         self.id = self.raw_id - 0x8000
         self.orig_id = self.id
 
     def __repr__(self):
-        return 'LogLine{used: %s, status: %d (0x%x), id: 0x%x, len: %d (0x%x), op: 0x%x, share_id: %d, uoid: %08x}' \
+        return 'LogLine{used: %s, status: %d (0x%x), id: 0x%x, len: %d (0x%x), op: 0x%x, share_id: %d, data: %08x}' \
                % (self.used, self.status, self.status, self.id, self.len, self.len, self.operation,
-                  self.share_id, self.uoid)
+                  self.share_id, self.data)
 
 
 class RSAPublicKey(object):
