@@ -58,7 +58,7 @@ class App(Cmd):
         self.last_n_logs = 5
 
         self.noninteractive = False
-        self.version = 'Latest'
+        self.version = self.load_version()
         self.hide_key = True
         self.root_required = False
 
@@ -90,6 +90,7 @@ class App(Cmd):
                      '\n    list  - lists all key shares' + \
                      '\n    erase - removes all key shares' + \
                      '\n    logs  - dumps card logs' + \
+                     '\n    quit  - exits the importer' + \
                      '\n    usage - shows simple command list'
 
         self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
@@ -230,6 +231,35 @@ class App(Cmd):
                   % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.uoid))
 
         return self.return_code(0)
+
+    def do_cardid(self, line):
+        """Prints the card ID"""
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
+        key = self.get_pubkey()
+        key_fmted = self.format_pubkey(key)
+
+        print('Card ID: %s' % key_fmted)
+        return self.return_code(0)
+
+    def do_importkey(self, line):
+        if self.bootstrap() != 0:
+            return self.return_code(1)
+
+        key = self.get_seed_pubkey()
+        key_fmted = self.format_pubkey(key)
+
+        print('ImportKey: %s' % key_fmted)
+        return self.return_code(0)
+
+    def format_pubkey(self, pubkey):
+        pem = utils.rsa_pub_key_to_pem(pubkey.n, pubkey.e)
+        sha = utils.sha1_hex(pem)
+        res = []
+        for i in range(0, len(sha), 2):
+            res.append('%s%s' % (sha[i], sha[i+1]))
+        return ':'.join(res)
 
     def bootstrap(self):
         if not self.check_root() or not self.check_pid():
@@ -511,6 +541,16 @@ class App(Cmd):
         pk.parse(res)
         return pk
 
+    def get_seed_pubkey(self):
+        res, sw = self.send_get_seed_pubkey()
+        if sw != 0x9000:
+            logger.error('Could not get public key, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
+
+        pk = RSAPublicKey()
+        pk.parse(res)
+        return pk
+
     def connect_card(self):
         try:
             self.connection = self.card.createConnection()
@@ -558,6 +598,10 @@ class App(Cmd):
 
     def send_get_pubkey(self):
         res, sw = self.transmit_long([0xb6, 0xe1, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_get_seed_pubkey(self):
+        res, sw = self.transmit_long([0xb6, 0xd3, 0x0, 0x0, 0x0])
         return res, sw
 
     def transmit_long(self, data, **kwargs):
