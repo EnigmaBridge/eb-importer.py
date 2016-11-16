@@ -145,9 +145,16 @@ class App(Cmd):
             return self.return_code(1)
 
         # Add a new share
-        code, res, sw = self.add_share(free_shares=free_shares)
-        if code == 0:
-            print(self.t.green('New share added successfully!'))
+        try:
+            code, res, sw = self.add_share(free_shares=free_shares)
+            if code == 0:
+                print(self.t.green('New share added successfully!'))
+            elif code == 2:
+                print(self.t.yellow('Not adding the key share'))
+            else:
+                print(self.t.red('Key share was not added'))
+        except Exception as e:
+            logger.error('Exception: %s' % e)
 
         # Dump shares again
         shares_end = self.get_shares()
@@ -164,7 +171,6 @@ class App(Cmd):
                     continue
                 if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id <= logs_start_max_id:
                     continue
-                op_str = 'N/A'
                 self.dump_log_line(msg)
         else:
             print('There are no logs on the card')
@@ -304,7 +310,7 @@ class App(Cmd):
         # Last share left
         if share_idx is None and free_shares is not None and len(free_shares) == 1:
             if not self.ask_proceed('The last share %d is about to set, is that correct? (y/n): ' % free_shares[0]):
-                return self.return_code(1)
+                return self.return_code(2), None, 0
             share_idx = free_shares[0]
 
         # Ask for share idx
@@ -374,7 +380,7 @@ class App(Cmd):
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
                 if ok == self.PROCEED_QUIT:
-                    return self.return_code(1)
+                    return self.return_code(2), None, None
                 elif ok == self.PROCEED_YES:
                     break
 
@@ -422,7 +428,7 @@ class App(Cmd):
         ok = self.ask_proceed('Shall the key share be imported? (y/n): ')
         if not ok:
             logger.error('Key import aborted')
-            return self.return_code(1)
+            return self.return_code(2), None, None
 
         # Add share to the card - format the data.
         # 0xa9 | <key length - 2B> | <share index - 1 B> | <key type - 1 B> |<share value> |
