@@ -282,7 +282,7 @@ class App(Cmd):
 
     def dump_share(self, idx, share):
         if idx == 3:
-            print('\nComposite key: ')
+            print('\nFinal key: ')
         else:
             print('\nShare #%d: ' % (idx+1))
 
