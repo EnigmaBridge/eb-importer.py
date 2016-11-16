@@ -107,6 +107,7 @@ class App(Cmd):
         print('erase  - removes all key shares')
         print('logs   - dumps card logs')
         print('usage  - writes this usage info')
+        print('quit   - exits the importer')
 
     def do_add(self, line):
         """Adds a new share to the card"""
