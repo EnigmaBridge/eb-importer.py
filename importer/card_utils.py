@@ -235,7 +235,7 @@ class Logs(object):
     def add(self, line):
         self.lines.append(line)
 
-    def sort(self):
+    def process(self):
         """
         Sorts log lines from the latest to the newest
         """

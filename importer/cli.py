@@ -529,7 +529,7 @@ class App(Cmd):
             idx += clen
 
         # Fix the ordering w.r.t. overflows counter
-        logs.sort()
+        logs.process()
         return logs
 
     def get_pubkey(self):
