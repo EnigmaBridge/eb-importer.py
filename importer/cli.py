@@ -294,7 +294,7 @@ class App(Cmd):
             return
 
         share_type = get_key_type(id=share.key_type)
-        print(' - Type: %s (0x%02x)' % (share_type.name if share_type is not None else '?', share.key_type))
+        print(' - Type: %s' % (share_type.name if share_type is not None else '?'))
         print(' - Used: %s' % share.used)
         print(' - Share length: %d' % share.share_len)
         print(' - KCV: %s' % format_data([share.kcv1 >> 8, share.kcv1 & 0xff, share.kcv2 >> 8]))
