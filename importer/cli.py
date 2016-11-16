@@ -65,6 +65,7 @@ class App(Cmd):
         self.t = Terminal()
         self.update_intro()
 
+        self.readers = []
         self.card = None
         self.connection = None
 
@@ -646,7 +647,7 @@ class App(Cmd):
         sw = (sw1 << 8) | sw2
         return resp, sw
 
-    def select_card(self):
+    def select_card(self, allow_more_cards=False):
         rlist = readers()
         available_readers = []
         for reader in rlist:
@@ -657,11 +658,12 @@ class App(Cmd):
             except:
                 pass
 
+        self.readers = available_readers
         if len(available_readers) == 0:
             print(self.t.red('No cards connected'))
             return self.return_code(101)
 
-        if len(available_readers) > 1:
+        if not allow_more_cards and len(available_readers) > 1:
             print(self.t.red('More than one card detected'))
             print('Please unplug all smart card readers you don\'t want to use.')
             print('For more info, try command: cards')
