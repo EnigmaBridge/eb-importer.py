@@ -230,6 +230,7 @@ class Logs(object):
         self.signature = None
         self.container = None
         self.max_idx = None
+        self.max_id = None
         self.was_sorted = False
 
     def add(self, line):
@@ -291,6 +292,7 @@ class Logs(object):
             if max_id is None:
                 max_id = clog.id
                 self.max_idx = idx
+                self.max_id = max_id
                 continue
 
             diff = abs(lines[idx+1].id - lines[idx].id)
