@@ -239,6 +239,8 @@ class Logs(object):
         """
         Sorts log lines from the latest to the newest
         """
+        if self.was_sorted:
+            return
 
         # Overflows total ID computation.
         # The last used log entry is not the latest - round robin buffering is used.
@@ -276,9 +278,6 @@ class Logs(object):
         # Scan logs in DESC ordering, if there is a big shift compared to the previous ID,
         # overflow happened. Overflow is up-to-date for the last record only. Fot others it has to
         # be recomputed.
-        if self.was_sorted:
-            return
-
         lines = self.lines
         max_id = None
         offset = 0L
