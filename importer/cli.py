@@ -284,7 +284,7 @@ class App(Cmd):
         if idx == 3:
             print('\nComposite key: ')
         else:
-            print('\nShare idx %d: ' % (idx+1))
+            print('\nShare #%d: ' % (idx+1))
 
         if not share.used:
             print(' - EMPTY')
