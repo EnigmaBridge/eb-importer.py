@@ -669,7 +669,7 @@ class App(Cmd):
                     pass
 
         self.card = available_readers[selected]
-        print('\nGoing to use the card: %s' % self.card)
+        print('\nKey importer version %s. \nGoing to use the card: %s' % (self.version, self.card))
         return 0
 
     def return_code(self, code=0):
