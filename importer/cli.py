@@ -190,7 +190,7 @@ class App(Cmd):
         print(self.t.underline_red('! WARNING !'))
         print('This is a destructive operation, all shares will be unrecoverably deleted from the card')
         if not self.ask_proceed('Do you really want to remove all key shares? (y/n): ', support_non_interactive=True):
-            return self.return_code(1)
+            return self.return_code(0)
 
         # Erase
         resp, sw = self.send_erase_shares()
