@@ -87,7 +87,7 @@ class App(Cmd):
                      '\n    cardid     - dumps card ID' + \
                      '\n    importkey  - dumps the import key ID' + \
                      '\n    quit       - exits the importer' + \
-                     '\n    usage      - shows simple command list'
+                     '\n    usage      - shows simple command list\n'
 
         self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
                       '-'*self.get_term_width()
