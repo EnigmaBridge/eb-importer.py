@@ -158,7 +158,7 @@ class App(Cmd):
         logs_end = self.get_logs()
         if len(logs_end.lines) > 0 and logs_end.max_idx is not None:
             logs_end_max_id = logs_end.max_id
-            print('\nLatest log id: %X' % logs_end_max_id)
+            print('\nNew log entries. Latest log entry: %X' % logs_end_max_id)
             for msg in logs_end.lines:
                 if not msg.used:
                     continue
