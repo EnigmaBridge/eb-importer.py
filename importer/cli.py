@@ -342,10 +342,10 @@ class App(Cmd):
                               % format_data(toBytes(key_share)))
 
                 if self.hide_key:
-                    print('The following key share will be imported: \n  KVC: %s\n'
+                    print('The following key share will be imported: \n  KCV: %s\n'
                           % (format_data(kcv[0:3])))
                 else:
-                    print('The following key share will be imported: \n  %s\n  KVC: %s\n'
+                    print('The following key share will be imported: \n  %s\n  KCV: %s\n'
                           % (format_data(key_share_arr), format_data(kcv[0:3])))
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
@@ -389,7 +389,7 @@ class App(Cmd):
         print(' - Key type: %s' % key_type.name)
         if not self.hide_key:
             print(' - Key: %s' % (format_data(key_share_arr)))
-        print(' - KVC: %s' % (format_data(kcv[0:3])))
+        print(' - KCV: %s' % (format_data(kcv[0:3])))
         print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
         print(' - Text descriptor: %s' % txt_desc)
