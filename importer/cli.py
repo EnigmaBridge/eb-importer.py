@@ -112,7 +112,7 @@ class App(Cmd):
     def do_add(self, line):
         """Adds a new share to the card"""
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         # Get logs
         logs_start = self.get_logs()
@@ -180,7 +180,7 @@ class App(Cmd):
     def do_list(self, line):
         """List all shares"""
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         shares = self.get_shares()
         for idx, share in enumerate(shares):
@@ -190,7 +190,7 @@ class App(Cmd):
     def do_erase(self, line):
         """Deletes all shares present"""
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         # Warning
         print('')
@@ -211,7 +211,7 @@ class App(Cmd):
     def do_logs(self, line):
         """Dump logs"""
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         # Dump logs
         logs = self.get_logs()
@@ -226,7 +226,7 @@ class App(Cmd):
     def do_cardid(self, line):
         """Prints the card ID"""
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         key = self.get_pubkey()
         key_fmted = self.format_pubkey(key)
@@ -236,13 +236,16 @@ class App(Cmd):
 
     def do_importkey(self, line):
         if self.bootstrap() != 0:
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         key = self.get_seed_pubkey()
         key_fmted = self.format_pubkey(key)
 
         print('\nImportKey: %s' % key_fmted)
         return self.return_code(0)
+
+    def do_cards(self, line):
+        pass
 
     def format_pubkey(self, pubkey):
         pem = utils.rsa_pub_key_to_pem(pubkey.n, pubkey.e)
@@ -258,9 +261,9 @@ class App(Cmd):
 
         # Pick card to use
         try:
-            self.select_card()
+            res = self.select_card()
             if self.card is None:
-                return self.return_code(2)
+                return self.return_code(res)
 
             self.connect_card()
             self.select_importcard()
@@ -653,11 +656,22 @@ class App(Cmd):
                 pass
 
         if len(available_readers) == 0:
-            logger.error("No cards connected")
-            return self.return_code(1)
+            print(self.t.red('No cards connected'))
+            return self.return_code(101)
 
-        selected = 0
         if len(available_readers) > 1:
+            print(self.t.red('More than one card detected'))
+            print('Please unplug all smart card readers you don\'t want to use.')
+            print('For more info, try command: cards')
+            return self.return_code(102)
+
+        self.card = available_readers[0]
+        return self.return_code(0)
+
+    def select_card_available(self, available_readers):
+        if len(available_readers) == 0:
+            return None
+        elif len(available_readers) > 1:
             while True:
                 try:
                     selected = self.select(enumerate(available_readers),
@@ -674,12 +688,13 @@ class App(Cmd):
 
                 except Exception as e:
                     pass
+        else:
+            return available_readers[0]
 
-        self.card = available_readers[selected]
-        return 0
-
-    def return_code(self, code=0):
+    def return_code(self, code=0, if_interactive_return_ok=False):
         self.last_result = code
+        if if_interactive_return_ok:
+            return 0
         return code
 
     def cli_sleep(self, iter=5):
