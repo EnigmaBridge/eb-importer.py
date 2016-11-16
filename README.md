@@ -1,12 +1,12 @@
 # [Enigma Bridge] Key Importer
 
-With this repo you can use [Enigma Bridge] encryption service.
+Used for importing keys securely to the [EnigmaBridge]
 
 ## Installation
 
 ```bash
-pip install ebclient.py
+pip install ebimporter.py
 ```
 
 [Enigma Bridge]: https://www.enigmabridge.com
-[API documentation]: https://api.enigmabridge.com/api/?python
+
