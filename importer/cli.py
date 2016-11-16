@@ -117,7 +117,7 @@ class App(Cmd):
         # Get logs
         logs_start = self.get_logs()
         logs_start_max_idx = logs_start.max_idx
-        logs_start_max_id = logs_start.lines[logs_start_max_idx].id if logs_start_max_idx is not None else 0
+        logs_start_max_id = logs_start.max_id
 
         # Show last N logs
         logs_to_show = [x for x in logs_start.lines if x.used]
@@ -162,7 +162,7 @@ class App(Cmd):
         # Logs since last dump
         logs_end = self.get_logs()
         if len(logs_end.lines) > 0 and logs_end.max_idx is not None:
-            logs_end_max_id = logs_end.lines[logs_end.max_idx].id
+            logs_end_max_id = logs_end.max_id
             print('\nLatest log id: %X' % logs_end_max_id)
             for msg in logs_end.lines:
                 if not msg.used:
