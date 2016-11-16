@@ -125,11 +125,11 @@ class App(Cmd):
             logs_to_show = logs_start.lines[logs_start_max_idx - self.last_n_logs + 1: logs_start_max_idx+1]
 
         if len(logs_to_show) > 0:
-            print('Last %d log lines: ' % len(logs_to_show))
+            print('\nLast %d log lines: ' % len(logs_to_show))
             for msg in logs_to_show:
                 self.dump_log_line(msg)
         else:
-            print('There are no logs on the card')
+            print('\nThere are no logs on the card')
 
         # Show all shares
         shares_start = self.get_shares()
