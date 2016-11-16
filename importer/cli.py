@@ -127,12 +127,7 @@ class App(Cmd):
         if len(logs_to_show) > 0:
             print('Last %d log lines: ' % len(logs_to_show))
             for msg in logs_to_show:
-                op_str = 'N/A'
-                if msg.operation in operation_logs:
-                    op_str = operation_logs[msg.operation]
-
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
+                self.dump_log_line(msg)
         else:
             print('There are no logs on the card')
 
@@ -170,11 +165,7 @@ class App(Cmd):
                 if logs_start_max_id is not None and logs_start_max_id > 0 and msg.id <= logs_start_max_id:
                     continue
                 op_str = 'N/A'
-                if msg.operation in operation_logs:
-                    op_str = operation_logs[msg.operation]
-
-                print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
-                      % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
+                self.dump_log_line(msg)
         else:
             print('There are no logs on the card')
 
@@ -221,14 +212,7 @@ class App(Cmd):
         print('Log lines:')
 
         for msg in logs.lines:
-            if not msg.used:
-                continue
-            op_str = 'N/A'
-            if msg.operation in operation_logs:
-                op_str = operation_logs[msg.operation]
-
-            print('Status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
-                  % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
+            self.dump_log_line(msg)
 
         return self.return_code(0)
 
@@ -278,6 +262,16 @@ class App(Cmd):
         except Exception as e:
             logger.error('Exception in setting import card: %s', e)
             raise
+
+    def dump_log_line(self, msg):
+        op_str = 'N/A'
+        if not msg.used:
+            return
+        if msg.operation in operation_logs:
+            op_str = operation_logs[msg.operation]
+
+        print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
+              % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
 
     def dump_share(self, idx, share):
         if idx == 3:
