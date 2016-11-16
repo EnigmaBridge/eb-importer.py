@@ -9,8 +9,9 @@ import math
 import hashlib
 import traceback
 import logging
+import errors
 from smartcard.System import readers
-from smartcard.util import toHexString
+from smartcard.util import toHexString, toBytes, PACK
 from Crypto.Util.py3compat import *
 from Crypto.Util.number import long_to_bytes, bytes_to_long, size, ceil_div
 
@@ -386,4 +387,219 @@ class RSAPublicKey(object):
     def __repr__(self):
         return 'RSAPubKey{n: %x, e: %x}' % (self.n, self.e)
 
+
+class EBCardReader(object):
+    """
+    EB Card reader info
+    """
+    def __init__(self, reader=None, card_ok=False, *args, **kwargs):
+        self.reader = reader
+        self.card_ok = card_ok
+        self.import_applet_ok = False
+        self.card_id = None
+
+
+class EBCard(object):
+    """
+    EB Card utils
+    """
+    def __init__(self, reader=None, connection=None, *args, **kwargs):
+        self.card = reader
+        self.connection = connection
+        self.debug = False
+
+    def get_shares(self):
+        res, sw = self.send_get_shares()
+        if sw != 0x9000:
+            logger.error('Could not get key shares info, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get key shares info, code: %04X' % sw)
+
+        key_shares = []
+        cur_share = None
+
+        # TLV parser
+        tlen = len(res)
+        tag, clen, idx = 0, 0, 0
+        while idx < tlen:
+            tag = res[idx]
+            clen = get_2bytes(res, idx+1)
+            idx += 3
+            cdata = res[idx: (idx + clen)]
+
+            if tag == 0xa9:
+                # KeyShare info
+                if cur_share is not None:
+                    key_shares.append(cur_share)
+
+                cur_share = KeyShareInfo()
+                cur_share.parse_info(cdata)
+
+            elif tag == 0xad:
+                # KeyShare message
+                cur_share.parse_message(cdata)
+
+            idx += clen
+        pass
+
+        if cur_share is not None:
+            key_shares.append(cur_share)
+
+        return key_shares
+
+    def get_logs(self, limit=None):
+        res, sw = self.send_get_logs()
+        if sw != 0x9000:
+            logger.error('Could not get logs, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get logs, code: %04X' % sw)
+
+        logs = Logs()
+
+        # TLV parser
+        tlen = len(res)
+        tag, clen, idx = 0, 0, 0
+        while idx < tlen:
+            tag = res[idx]
+            clen = get_2bytes(res, idx+1)
+            idx += 3
+            cdata = res[idx: (idx + clen)]
+
+            if tag == 0xae:
+                # Log container
+                entries = get_2bytes(cdata)
+                logs.overflows = get_2bytes(cdata, 2)
+
+                # Store the whole container for signature verification
+                logs.container = cdata
+
+                # Extract each log line record
+                for entry_idx in range(0, entries):
+                    offset = 4 + entry_idx * 15
+                    cline = cdata[offset:offset+15]
+
+                    cur_log = LogLine()
+                    cur_log.parse_line(cline, logs)
+                    logs.add(cur_log)
+
+            elif tag == 0xab:
+                # Signature
+                logs.signature = cdata
+
+            idx += clen
+
+        # Fix the ordering w.r.t. overflows counter
+        logs.process()
+        return logs
+
+    def get_pubkey(self):
+        res, sw = self.send_get_pubkey()
+        if sw != 0x9000:
+            logger.error('Could not get public key, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
+
+        pk = RSAPublicKey()
+        pk.parse(res)
+        return pk
+
+    def get_seed_pubkey(self):
+        res, sw = self.send_get_seed_pubkey()
+        if sw != 0x9000:
+            logger.error('Could not get public key, code: %04X' % sw)
+            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
+
+        pk = RSAPublicKey()
+        pk.parse(res)
+        return pk
+
+    def connect_card(self):
+        try:
+            self.connection = self.card.createConnection()
+            self.connection.connect()
+        except Exception as e:
+            logger.error('Exception in opening a connection: %s' % e)
+            if self.debug:
+                traceback.print_exc()
+            raise e
+
+    def select_importcard(self):
+        resp, sw = self.select_applet([0x31, 0x32, 0x33, 0x34, 0x35, 0x36])
+        if sw != 0x9000:
+            raise errors.InvalidApplet('Could not select import card applet. Error: %04X' % sw)
+
+        return resp, sw
+
+    def select_applet(self, id):
+        select = [0x00, 0xA4, 0x04, 0x00, len(id)]
+
+        resp, sw = self.transmit_long(select + id)
+        logger.debug('Selecting applet, response: %s, code: %04X' % (resp, sw))
+        return resp, sw
+
+    def send_add_share(self, data):
+        res, sw = self.transmit_long([0xb6, 0x31, 0x0, 0x0, len(data)] + data)
+        return res, sw
+
+    def send_get_logs(self):
+        res, sw = self.transmit_long([0xb6, 0xe7, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_continuation(self, code):
+        res, sw = self.transmit([0x00, 0xc0, 0x00, 0x00, code])
+        return res, sw
+
+    def send_get_shares(self):
+        res, sw = self.transmit_long([0xb6, 0x35, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_erase_shares(self):
+        res, sw = self.transmit_long([0xb6, 0x33, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_get_pubkey(self):
+        res, sw = self.transmit_long([0xb6, 0xe1, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def send_get_seed_pubkey(self):
+        res, sw = self.transmit_long([0xb6, 0xd3, 0x0, 0x0, 0x0])
+        return res, sw
+
+    def transmit_long(self, data, **kwargs):
+        """
+        Transmits data with option of long buffer reading - multiple reads
+        :param data:
+        :return:
+        """
+        resp, sw = self.transmit(data)
+        cont_bytes = get_continue_bytes(sw)
+
+        # Dump continued data
+        while cont_bytes is not None:
+            res2, sw2 = self.send_continuation(cont_bytes)
+            resp += res2 if res2 is not None else []
+            sw = sw2
+
+            if len(res2) != cont_bytes:
+                logger.error('Continuation protocol invalid, cont_bytes: %x, got: %x, sw: %x'
+                             % (cont_bytes, len(res2), sw2))
+                raise errors.InvalidResponse('Data continuation protocol invalid')
+
+            cont_bytes = get_continue_bytes(sw2)
+
+        return resp, sw
+
+    def transmit(self, data):
+        logger.debug('Data: %s' % format_data(data))
+        resp, sw1, sw2 = self.connection.transmit(data)
+        sw = (sw1 << 8) | sw2
+        return resp, sw
+
+    @staticmethod
+    def build_data_add_share(key_share_arr, share_idx, key_type, txt_desc_hex):
+        # 0xa9 | <key length - 2B> | <share index - 1 B> | <key type - 1 B> |<share value> |
+        # 0xad | <message length - 2B> | <text message - max 16B>
+        data_buff = 'a9%04x%02x%02x' % ((len(key_share_arr) + 2) & 0xffff, (share_idx) & 0xff, key_type.id)
+        data_buff += toHexString(key_share_arr, PACK)
+        data_buff += 'ad%04x' % len(txt_desc_hex)
+        data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
+        data_arr = toBytes(data_buff)
+        return data_arr
 

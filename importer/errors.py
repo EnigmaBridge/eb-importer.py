@@ -5,6 +5,10 @@ class Error(Exception):
     """Generic EB client error."""
 
 
+class InvalidApplet(Error):
+    """Applet select failed"""
+
+
 class InvalidResponse(Error):
     """Invalid server response"""
 

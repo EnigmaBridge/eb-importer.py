@@ -65,9 +65,7 @@ class App(Cmd):
         self.t = Terminal()
         self.update_intro()
 
-        self.readers = []
         self.card = None
-        self.connection = None
 
     def load_version(self):
         dist = None
@@ -87,12 +85,14 @@ class App(Cmd):
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
                      ('\n    Enigma Bridge Key Importer command line interface (v%s) \n' % self.version) + \
-                     '\n    add   - adds a new key share' + \
-                     '\n    list  - lists all key shares' + \
-                     '\n    erase - removes all key shares' + \
-                     '\n    logs  - dumps card logs' + \
-                     '\n    quit  - exits the importer' + \
-                     '\n    usage - shows simple command list'
+                     '\n    add        - adds a new key share' + \
+                     '\n    list       - lists all key shares' + \
+                     '\n    erase      - removes all key shares' + \
+                     '\n    logs       - dumps card logs' + \
+                     '\n    cardid     - dumps card ID' + \
+                     '\n    importkey  - dumps the import key ID' + \
+                     '\n    quit       - exits the importer' + \
+                     '\n    usage      - shows simple command list'
 
         self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
                       '-'*self.get_term_width()
@@ -104,12 +104,14 @@ class App(Cmd):
 
     def do_usage(self, line):
         """Shows basic commands"""
-        print('add    - adds a new key share')
-        print('list   - lists all key shares')
-        print('erase  - removes all key shares')
-        print('logs   - dumps card logs')
-        print('usage  - writes this usage info')
-        print('quit   - exits the importer')
+        print('add        - adds a new key share')
+        print('list       - lists all key shares')
+        print('erase      - removes all key shares')
+        print('logs       - dumps card logs')
+        print('cardid     - dumps card ID')
+        print('importkey  - dumps the import key ID')
+        print('usage      - writes this usage info')
+        print('quit       - exits the importer')
 
     def do_add(self, line):
         """Adds a new share to the card"""
@@ -117,7 +119,7 @@ class App(Cmd):
             return self.return_code(1, True)
 
         # Get logs
-        logs_start = self.get_logs()
+        logs_start = self.card.get_logs()
         logs_start_max_idx = logs_start.max_idx
         logs_start_max_id = logs_start.max_id
 
@@ -134,7 +136,7 @@ class App(Cmd):
             print('\nThere are no logs on the card')
 
         # Show all shares
-        shares_start = self.get_shares()
+        shares_start = self.card.get_shares()
         free_shares = []
         for idx, share in enumerate(shares_start):
             if not share.used and idx != 3:
@@ -144,7 +146,7 @@ class App(Cmd):
 
         if len(free_shares) == 0:
             print(self.t.red('Cannot add a new share, all are set'))
-            return self.return_code(1)
+            return self.return_code(1, True)
 
         # Add a new share
         try:
@@ -159,12 +161,12 @@ class App(Cmd):
             logger.error('Exception: %s' % e)
 
         # Dump shares again
-        shares_end = self.get_shares()
+        shares_end = self.card.get_shares()
         for idx, share in enumerate(shares_end):
             self.dump_share(idx, share)
 
         # Logs since last dump
-        logs_end = self.get_logs()
+        logs_end = self.card.get_logs()
         if len(logs_end.lines) > 0 and logs_end.max_idx is not None:
             logs_end_max_id = logs_end.max_id
             print('\nNew log entries. Latest log entry: %X' % logs_end_max_id)
@@ -184,7 +186,7 @@ class App(Cmd):
         if self.bootstrap() != 0:
             return self.return_code(1, True)
 
-        shares = self.get_shares()
+        shares = self.card.get_shares()
         for idx, share in enumerate(shares):
             self.dump_share(idx, share)
         print('')
@@ -202,7 +204,7 @@ class App(Cmd):
             return self.return_code(0)
 
         # Erase
-        resp, sw = self.send_erase_shares()
+        resp, sw = self.card.send_erase_shares()
         if sw != 0x9000:
             logger.error('Could not erase all shares, code: %04X' % sw)
             return self.return_code(1)
@@ -216,7 +218,7 @@ class App(Cmd):
             return self.return_code(1, True)
 
         # Dump logs
-        logs = self.get_logs()
+        logs = self.card.get_logs()
         print('\nLog entries: 0x%x' % logs.max_id)
         print('Log lines:')
 
@@ -230,7 +232,7 @@ class App(Cmd):
         if self.bootstrap() != 0:
             return self.return_code(1, True)
 
-        key = self.get_pubkey()
+        key = self.card.get_pubkey()
         key_fmted = self.format_pubkey(key)
 
         print('\nCard ID: %s' % key_fmted)
@@ -241,14 +243,67 @@ class App(Cmd):
         if self.bootstrap() != 0:
             return self.return_code(1, True)
 
-        key = self.get_seed_pubkey()
+        key = self.card.get_seed_pubkey()
         key_fmted = self.format_pubkey(key)
 
         print('\nImportKey: %s' % key_fmted)
         return self.return_code(0)
 
     def do_cards(self, line):
-        pass
+        """Lists all cards in the system"""
+        if not self.check_root() or not self.check_pid():
+            return self.return_code(1)
+
+        print('\nLoading connected cards...\n')
+
+        # List all cards
+        try:
+            rlist = readers()
+            devices = []
+            available_readers = []
+            for reader in rlist:
+                dev = EBCardReader(reader)
+                try:
+                    connection = reader.createConnection()
+                    connection.connect()
+                    dev.card_ok = True
+                    available_readers.append(reader)
+
+                    ebcard = EBCard(reader, connection)
+                    ebcard.select_importcard()
+                    dev.import_applet_ok = True
+
+                    # Read the card key
+                    key = ebcard.get_pubkey()
+                    dev.card_id = self.format_pubkey(key)
+
+                except errors.InvalidApplet as e:
+                    dev.import_applet_ok = False
+
+                except Exception as e:
+                    dev.card_ok = False
+
+                devices.append(dev)
+
+            if len(devices) == 0:
+                print(self.t.red('No card reader connected'))
+                return self.return_code(1, True)
+
+            for idx, dev in enumerate(devices):
+                if not dev.card_ok:
+                    print('%02d. No card present\n    reader: %s\n' % (idx+1, dev.reader))
+                elif not dev.import_applet_ok:
+                    print('%02d. Unknown card\n    reader: %s\n' % (idx+1, dev.reader))
+                elif dev.card_id is None:
+                    print('%02d. Uninitialized card\n    reader: %s\n' % (idx+1, dev.reader))
+                else:
+                    print('%02d. Import card %s\n    reader: %s\n' % (idx+1, dev.card_id, dev.reader))
+
+            return self.return_code(0)
+
+        except Exception as e:
+            logger.error('Exception in setting import card: %s', e)
+            raise
 
     def format_pubkey(self, pubkey):
         pem = utils.rsa_pub_key_to_pem(pubkey.n, pubkey.e)
@@ -268,11 +323,11 @@ class App(Cmd):
             if self.card is None:
                 return self.return_code(res)
 
-            self.connect_card()
-            self.select_importcard()
+            self.card.connect_card()
+            self.card.select_importcard()
 
             # Read the card key
-            key = self.get_pubkey()
+            key = self.card.get_pubkey()
             key_fmted = self.format_pubkey(key)
 
             print('\nKey importer version %s. \nGoing to use the card: %s' % (self.version, key_fmted))
@@ -280,7 +335,8 @@ class App(Cmd):
 
         except Exception as e:
             logger.error('Exception in setting import card: %s', e)
-            raise
+            print(self.t.red('Error: could not load the import card'))
+            return self.return_code(1)
 
     def dump_log_line(self, msg):
         op_str = 'N/A'
@@ -316,7 +372,7 @@ class App(Cmd):
     def add_share(self, share_idx=None, free_shares=None):
         # Enter key share
         key_types = get_key_types()
-        key_type_idx, key_share, key_share_bin, key_share_arr, kcv = None, None, None, None, None
+        key_type_idx, key_share, key_share_fix, key_share_bin, key_share_arr, kcv = None, None, None, None, None, None
 
         print('\nAdd new key share procedure started\n')
 
@@ -444,16 +500,10 @@ class App(Cmd):
             return self.return_code(2), None, None
 
         # Add share to the card - format the data.
-        # 0xa9 | <key length - 2B> | <share index - 1 B> | <key type - 1 B> |<share value> |
-        # 0xad | <message length - 2B> | <text message - max 16B>
-        data_buff = 'a9%04x%02x%02x' % ((len(key_share_arr) + 2) & 0xffff, (share_idx-1) & 0xff, key_type.id)
-        data_buff += key_share
-        data_buff += 'ad%04x' % len(txt_desc_hex)
-        data_buff += ''.join(['%02x' % x for x in txt_desc_hex])
-        data_arr = toBytes(data_buff)
+        data_arr = EBCard.build_data_add_share(key_share_arr, share_idx-1, key_type, txt_desc_hex)
 
-        logger.debug('Import Msg: %s' % data_buff)
-        res, sw = self.send_add_share(data_arr)
+        logger.debug('Import Msg: %s' % format_data(data_arr))
+        res, sw = self.card.send_add_share(data_arr)
         if sw == 0x808f:
             logger.error('Share %d already exists (code %04X)' % (share_idx, sw))
         elif sw != 0x9000:
@@ -462,214 +512,20 @@ class App(Cmd):
 
         return 0, res, sw
 
-    def get_shares(self):
-        res, sw = self.send_get_shares()
-        if sw != 0x9000:
-            logger.error('Could not get key shares info, code: %04X' % sw)
-            raise errors.InvalidResponse('Could not get key shares info, code: %04X' % sw)
-
-        key_shares = []
-        cur_share = None
-
-        # TLV parser
-        tlen = len(res)
-        tag, clen, idx = 0, 0, 0
-        while idx < tlen:
-            tag = res[idx]
-            clen = get_2bytes(res, idx+1)
-            idx += 3
-            cdata = res[idx: (idx + clen)]
-
-            if tag == 0xa9:
-                # KeyShare info
-                if cur_share is not None:
-                    key_shares.append(cur_share)
-
-                cur_share = KeyShareInfo()
-                cur_share.parse_info(cdata)
-
-            elif tag == 0xad:
-                # KeyShare message
-                cur_share.parse_message(cdata)
-
-            idx += clen
-        pass
-
-        if cur_share is not None:
-            key_shares.append(cur_share)
-
-        return key_shares
-
-    def get_logs(self, limit=None):
-        res, sw = self.send_get_logs()
-        if sw != 0x9000:
-            logger.error('Could not get logs, code: %04X' % sw)
-            raise errors.InvalidResponse('Could not get logs, code: %04X' % sw)
-
-        logs = Logs()
-
-        # TLV parser
-        tlen = len(res)
-        tag, clen, idx = 0, 0, 0
-        while idx < tlen:
-            tag = res[idx]
-            clen = get_2bytes(res, idx+1)
-            idx += 3
-            cdata = res[idx: (idx + clen)]
-
-            if tag == 0xae:
-                # Log container
-                entries = get_2bytes(cdata)
-                logs.overflows = get_2bytes(cdata, 2)
-
-                # Store the whole container for signature verification
-                logs.container = cdata
-
-                # Extract each log line record
-                for entry_idx in range(0, entries):
-                    offset = 4 + entry_idx * 15
-                    cline = cdata[offset:offset+15]
-
-                    cur_log = LogLine()
-                    cur_log.parse_line(cline, logs)
-                    logs.add(cur_log)
-
-            elif tag == 0xab:
-                # Signature
-                logs.signature = cdata
-
-            idx += clen
-
-        # Fix the ordering w.r.t. overflows counter
-        logs.process()
-        return logs
-
-    def get_pubkey(self):
-        res, sw = self.send_get_pubkey()
-        if sw != 0x9000:
-            logger.error('Could not get public key, code: %04X' % sw)
-            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
-
-        pk = RSAPublicKey()
-        pk.parse(res)
-        return pk
-
-    def get_seed_pubkey(self):
-        res, sw = self.send_get_seed_pubkey()
-        if sw != 0x9000:
-            logger.error('Could not get public key, code: %04X' % sw)
-            raise errors.InvalidResponse('Could not get public key, code: %04X' % sw)
-
-        pk = RSAPublicKey()
-        pk.parse(res)
-        return pk
-
-    def connect_card(self):
-        try:
-            self.connection = self.card.createConnection()
-            self.connection.connect()
-        except Exception as e:
-            logger.error('Exception in opening a connection: %s' % e)
-            if self.args.debug:
-                traceback.print_exc()
-            raise e
-
-    def select_importcard(self):
-        resp, sw = self.select_applet([0x31, 0x32, 0x33, 0x34, 0x35, 0x36])
-        if sw != 0x9000:
-            logger.error('Could not select import card applet. Error: %04X' % sw)
-            raise errors.InvalidResponse('Could not select import card applet. Error: %04X' % sw)
-
-        return resp, sw
-
-    def select_applet(self, id):
-        select = [0x00, 0xA4, 0x04, 0x00, len(id)]
-
-        resp, sw = self.transmit_long(select + id)
-        logger.debug('Selecting applet, response: %s, code: %04X' % (resp, sw))
-        return resp, sw
-
-    def send_add_share(self, data):
-        res, sw = self.transmit_long([0xb6, 0x31, 0x0, 0x0, len(data)] + data)
-        return res, sw
-
-    def send_get_logs(self):
-        res, sw = self.transmit_long([0xb6, 0xe7, 0x0, 0x0, 0x0])
-        return res, sw
-
-    def send_continuation(self, code):
-        res, sw = self.transmit([0x00, 0xc0, 0x00, 0x00, code])
-        return res, sw
-
-    def send_get_shares(self):
-        res, sw = self.transmit_long([0xb6, 0x35, 0x0, 0x0, 0x0])
-        return res, sw
-
-    def send_erase_shares(self):
-        res, sw = self.transmit_long([0xb6, 0x33, 0x0, 0x0, 0x0])
-        return res, sw
-
-    def send_get_pubkey(self):
-        res, sw = self.transmit_long([0xb6, 0xe1, 0x0, 0x0, 0x0])
-        return res, sw
-
-    def send_get_seed_pubkey(self):
-        res, sw = self.transmit_long([0xb6, 0xd3, 0x0, 0x0, 0x0])
-        return res, sw
-
-    def transmit_long(self, data, **kwargs):
-        """
-        Transmits data with option of long buffer reading - multiple reads
-        :param data:
-        :return:
-        """
-        resp, sw = self.transmit(data)
-        cont_bytes = get_continue_bytes(sw)
-
-        # Dump continued data
-        while cont_bytes is not None:
-            res2, sw2 = self.send_continuation(cont_bytes)
-            resp += res2 if res2 is not None else []
-            sw = sw2
-
-            if len(res2) != cont_bytes:
-                logger.error('Continuation protocol invalid, cont_bytes: %x, got: %x, sw: %x'
-                             % (cont_bytes, len(res2), sw2))
-                raise errors.InvalidResponse('Data continuation protocol invalid')
-
-            cont_bytes = get_continue_bytes(sw2)
-
-        return resp, sw
-
-    def transmit(self, data):
-        logger.debug('Data: %s' % format_data(data))
-        resp, sw1, sw2 = self.connection.transmit(data)
-        sw = (sw1 << 8) | sw2
-        return resp, sw
-
-    def select_card(self, allow_more_cards=False):
+    def select_card(self):
         rlist = readers()
-        available_readers = []
-        for reader in rlist:
-            try:
-                connection = reader.createConnection()
-                connection.connect()
-                available_readers.append(reader)
-            except:
-                pass
 
-        self.readers = available_readers
-        if len(available_readers) == 0:
+        if len(rlist) == 0:
             print(self.t.red('No cards connected'))
             return self.return_code(101)
 
-        if not allow_more_cards and len(available_readers) > 1:
+        if len(rlist) > 1:
             print(self.t.red('More than one card detected'))
-            print('Please unplug all smart card readers you don\'t want to use.')
-            print('For more info, try command: cards')
+            print('  - Please unplug all smart card readers you don\'t want to use.')
+            print('  - For more info, try command: cards')
             return self.return_code(102)
 
-        self.card = available_readers[0]
+        self.card = EBCard(rlist[0])
         return self.return_code(0)
 
     def select_card_available(self, available_readers):
