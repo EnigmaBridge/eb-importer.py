@@ -804,7 +804,7 @@ class App(Cmd):
         args_src = sys.argv
 
         # Parse our argument list
-        parser = argparse.ArgumentParser(description='EnigmaBridge AWS client')
+        parser = argparse.ArgumentParser(description='EnigmaBridge Key Importer')
         parser.add_argument('-n', '--non-interactive', dest='noninteractive', action='store_const', const=True,
                             help='non-interactive mode of operation, command line only')
         parser.add_argument('-r', '--attempts', dest='attempts', type=int, default=3,
