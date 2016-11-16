@@ -264,6 +264,12 @@ class App(Cmd):
 
             self.connect_card()
             self.select_importcard()
+
+            # Read the card key
+            key = self.get_pubkey()
+            key_fmted = self.format_pubkey(key)
+
+            print('\nKey importer version %s. \nGoing to use the card: %s' % (self.version, key_fmted))
             return self.return_code(0)
 
         except Exception as e:
@@ -647,7 +653,7 @@ class App(Cmd):
                 pass
 
         if len(available_readers) == 0:
-            logger.error("No card readers in the system")
+            logger.error("No cards connected")
             return self.return_code(1)
 
         selected = 0
@@ -670,7 +676,6 @@ class App(Cmd):
                     pass
 
         self.card = available_readers[selected]
-        print('\nKey importer version %s. \nGoing to use the card: %s' % (self.version, self.card))
         return 0
 
     def return_code(self, code=0):
