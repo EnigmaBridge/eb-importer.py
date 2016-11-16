@@ -80,6 +80,7 @@ class App(Cmd):
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
                      ('\n    Enigma Bridge Key Importer command line interface (v%s) \n' % self.version) + \
+                     '\n    cards      - lists all connected cards' + \
                      '\n    add        - adds a new key share' + \
                      '\n    list       - lists all key shares' + \
                      '\n    erase      - removes all key shares' + \
@@ -99,6 +100,7 @@ class App(Cmd):
 
     def do_usage(self, line):
         """Shows basic commands"""
+        print('cards      - lists all connected cards')
         print('add        - adds a new key share')
         print('list       - lists all key shares')
         print('erase      - removes all key shares')
