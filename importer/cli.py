@@ -217,8 +217,7 @@ class App(Cmd):
 
         # Dump logs
         logs = self.get_logs()
-        print('Log entries: %d' % len(logs.lines))
-        print('Overflows: %d' % logs.overflows)
+        print('Log entries: 0x%x' % logs.max_id)
         print('Log lines:')
 
         for msg in logs.lines:
