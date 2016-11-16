@@ -227,6 +227,7 @@ class Logs(object):
     """
     def __init__(self, *args, **kwargs):
         self.lines = []
+        self.lines_all = []
         self.overflows = None
         self.signature = None
         self.container = None
@@ -301,6 +302,9 @@ class Logs(object):
                 offset += 0x10000L
                 clog.id -= offset
 
+        # Make lines contain only used entries
+        self.lines_all = self.lines
+        self.lines = [x for x in self.lines_all if x.used]
         self.was_sorted = True
 
     def __repr__(self):
