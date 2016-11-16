@@ -217,8 +217,29 @@ class App(Cmd):
         print('\nLog entries: 0x%x' % logs.max_id)
         print('Log lines:')
 
-        for msg in logs.lines:
+        lpp = 15  # logs per page
+        ln = len(logs.lines)
+        term_works = True
+        ctr = 0
+        for idx, msg in enumerate(logs.lines):
+            if ctr > lpp and term_works and not self.noninteractive:
+                row, col = self.t.get_location(timeout=1)
+                if row < 0 or col < 0:
+                    logger.warning('No loc')
+                    term_works = False
+
+                with self.t.location():
+                    with self.t.cbreak():
+                        sys.stdout.write('Press any key to continue (page %02d/%02d) ...'
+                                         % (idx/lpp, int(math.ceil(ln/float(lpp)))))
+                        sys.stdout.flush()
+                        self.t.inkey()
+                        self.t.clear_bol()
+                        self.t.clear_eol()
+                ctr = 0
+
             self.dump_log_line(msg)
+            ctr += 1
 
         return self.return_code(0)
 
