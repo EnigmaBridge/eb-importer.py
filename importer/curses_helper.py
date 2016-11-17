@@ -50,6 +50,7 @@ class KeyBox(object):
         self.last_x = 0
         self.last_y = 0
         win.keypad(1)
+        self._init_buffer()
 
     def goto_last(self):
         """
@@ -61,6 +62,13 @@ class KeyBox(object):
             self.win.move(self.last_y, self.last_x)
         except:
             pass
+
+    def _init_buffer(self):
+        self.buffer = []
+        for y in range(0, self.maxy+1):
+            self.buffer.append([])
+            for x in range(0, self.maxx):
+                self.buffer[y].append(curses.ascii.SP)
 
     def _end_of_line(self, y):
         """Go to the location of the first blank on the given line,
@@ -125,10 +133,7 @@ class KeyBox(object):
             y, x = self._translate(y, x)
 
             # Store the original character to the appropriate buffer position
-            # Initialize buffer with spaces.
-            while len(self.buffer) <= x:
-                self.buffer.append(curses.ascii.SP)
-            self.buffer[x] = ch
+            self.buffer[y][x] = ch
 
             if not self.hide_input or ch == curses.ascii.SP:
                 self.win.addch(y, x, ch)
@@ -157,7 +162,7 @@ class KeyBox(object):
 
         # Now work over the buffer, screen has placeholders
         try:
-            return self.buffer[x]
+            return self.buffer[y][x]
         except:
             return curses.ascii.SP
 
@@ -197,7 +202,7 @@ class KeyBox(object):
         y, x = self._translate(y, x, cur_y, cur_x)
 
         # update buffer
-        self.buffer = self.buffer[0:x] + self.buffer[x+1:] + [curses.ascii.SP]
+        self.buffer[y] = self.buffer[y][0:x] + self.buffer[y][x+1:] + [curses.ascii.SP]
 
         # delete the character
         self.win.delch(y, x)
@@ -207,19 +212,19 @@ class KeyBox(object):
 
         # Fix buffer spaces re-alignment, move space to 1 to the right
         # Buffer contains input string also with spaces.
-        self._move_delim(x)
+        self._move_delim(y, x)
 
         # Raw repainting from the buffer
         # Buffer contains spaces also, thus can be rerendered without coordinate remapping
         self.win.move(y, x)
-        self._redraw_buff(x)
+        self._redraw_buff(y, x)
         self.win.move(y, x)
         pass
 
-    def _move_delim(self, x, to_right=True):
+    def _move_delim(self, y, x, to_right=True):
         # Fix buffer spaces re-alignment, move space to 1 to the right
         # Buffer contains input string also with spaces.
-        ln = len(self.buffer)
+        ln = len(self.buffer[y])
         i = x
 
         loop_end = ln-1
@@ -228,20 +233,20 @@ class KeyBox(object):
             loop_end = ln
 
         while i < loop_end:
-            c = self.buffer[i]
+            c = self.buffer[y][i]
             if c == curses.ascii.SP:
-                n = self.buffer[i+1 if to_right else i-1]
-                self.buffer[i] = n
-                self.buffer[i+1 if to_right else i-1] = c
+                n = self.buffer[y][i+1 if to_right else i-1]
+                self.buffer[y][i] = n
+                self.buffer[y][i+1 if to_right else i-1] = c
                 if to_right:
                     i += 1
             i += 1
         pass
 
-    def _redraw_buff(self, x=0):
-        ln = len(self.buffer)
+    def _redraw_buff(self, y, x=0):
+        ln = len(self.buffer[y])
         for i in range(x, ln):
-            c = self.buffer[i]
+            c = self.buffer[y][i]
             if self.hide_input and c != curses.ascii.SP:
                 c = self.placeholder
             self.win.addch(c)
@@ -399,5 +404,30 @@ class curses_screen(object):
         self.stdscr.keypad(0)
         curses.echo()
         curses.endwin()
+
+
+if __name__ == '__main__':
+    import sys, coloredlogs
+    coloredlogs.install()
+    screen_wrapper = curses_screen()
+
+    # initializes curses for dialog
+    with screen_wrapper as win:
+        win.addstr(0, 0, 'Enter here some keys please')
+        win.refresh()
+
+        maxy, maxx = win.getmaxyx()
+        sys.stderr.write('maxy, maxx: %d %d\n' % (maxy, maxx))
+
+        win_key = curses.newwin(1, 40, 3, 4)
+        maxy, maxx = win_key.getmaxyx()
+        pary, parx = win_key.getparyx()
+
+        sys.stderr.write('win maxy, maxx: %d %d\n' % (maxy, maxx))
+        sys.stderr.write('win pary, parx: %d %d\n' % (pary, parx))
+
+        keybox = KeyBox(win_key, True)
+        keybox.hide_input = False
+        keybox.edit()
 
 
