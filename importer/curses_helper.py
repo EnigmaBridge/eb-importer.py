@@ -35,20 +35,22 @@ class KeyBox(object):
     KEY_LEFT = Ctrl-B, KEY_RIGHT = Ctrl-F, KEY_UP = Ctrl-P, KEY_DOWN = Ctrl-N
     KEY_BACKSPACE = Ctrl-h
     """
-    def __init__(self, win, insert_mode=False):
+    def __init__(self, win, insert_mode=False, hide_input=True, auto_format=True,
+                 auto_format_block_size=4, max_input_len=None, placeholder='*',
+                 stripspaces=1):
         self.win = win
         self.insert_mode = insert_mode
         (self.maxy, self.maxx) = win.getmaxyx()
         self.maxy = self.maxy - 1
         self.maxx = self.maxx - 1
-        self.stripspaces = 1
+        self.stripspaces = stripspaces
         self.lastcmd = None
         self.buffer = []
-        self.hide_input = True
-        self.placeholder = '*'
-        self.auto_format = True
-        self.auto_format_block_size = 4
-        self.max_input_len = None
+        self.hide_input = hide_input
+        self.placeholder = placeholder
+        self.auto_format = auto_format
+        self.auto_format_block_size = auto_format_block_size
+        self.max_input_len = max_input_len
         self.last_x = 0
         self.last_y = 0
         win.keypad(1)
