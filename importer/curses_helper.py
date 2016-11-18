@@ -67,7 +67,7 @@ class KeyBox(object):
         self.buffer = []
         for y in range(0, self.maxy+1):
             self.buffer.append([])
-            for x in range(0, self.maxx):
+            for x in range(0, self.maxx+1):
                 self.buffer[y].append(curses.ascii.SP)
 
     def _end_of_line(self, y):
@@ -419,7 +419,7 @@ if __name__ == '__main__':
         maxy, maxx = win.getmaxyx()
         sys.stderr.write('maxy, maxx: %d %d\n' % (maxy, maxx))
 
-        win_key = curses.newwin(1, 40, 3, 4)
+        win_key = curses.newwin(2, 38, 3, 0)
         maxy, maxx = win_key.getmaxyx()
         pary, parx = win_key.getparyx()
 
