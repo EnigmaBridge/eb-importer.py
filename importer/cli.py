@@ -79,18 +79,22 @@ class App(Cmd):
 
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
-                     ('\n    Enigma Bridge Key Importer command line interface (v%s) \n' % self.version) + \
-                     '\n    cards      - lists all connected cards' + \
-                     '\n    add        - adds a new key share' + \
-                     '\n    list       - lists all key shares' + \
-                     '\n    erase      - removes all key shares' + \
-                     '\n    logs       - dumps card logs' + \
-                     '\n    cardid     - dumps card ID' + \
-                     '\n    importkey  - dumps the import key ID' + \
-                     '\n    quit       - exits the importer' + \
-                     '\n    usage      - shows simple command list\n'
+                    ('\nEnigma Bridge Key Importer '\
+                     '\n   command line interface (v%s) \n' % self.version) + \
+                     '\n    cards      - list connected cards' + \
+                     '\n    add        - add new key share' + \
+                     '\n    list       - list all key shares' + \
+                     '\n    erase      - remove all key shares' + \
+                     '\n    logs       - dump card logs' + \
+                     '\n    cardid     - dump card ID' + \
+                     '\n    importkey  - dump import key ID' + \
+                     '\n    usage      - show this command list' + \
+                     '\n    quit       - exit  importer'
 
-        self.intro += '\n    More info: https://enigmabridge.com/importer \n' + \
+        self.intro += '\n' + \
+                      '\n' + \
+                      '\n Resources: ' + \
+                      '\n   https://enigmabridge.com/importer \n' + \
                       '-'*self.get_term_width()
 
     def do_version(self, line):
@@ -138,7 +142,7 @@ class App(Cmd):
         for idx, share in enumerate(shares_start):
             if not share.used and idx != 3:
                 free_shares.append(idx+1)
-            self.dump_share(idx, share)
+#            self.dump_share(idx, share)
         print('\n')
 
         if len(free_shares) == 0:
@@ -162,6 +166,14 @@ class App(Cmd):
         for idx, share in enumerate(shares_end):
             self.dump_share(idx, share)
 
+
+        with self.t.location():
+            with self.t.cbreak():
+                sys.stdout.write('\n\n Press any key to continue ...')
+                sys.stdout.flush()
+                self.t.inkey()
+                self.t.clear_bol()
+                self.t.clear_eol()
         # Logs since last dump
         logs_end = self.card.get_logs()
         if len(logs_end.lines) > 0 and logs_end.max_idx is not None:
@@ -219,7 +231,7 @@ class App(Cmd):
         print('\nLog entries: 0x%x' % logs.max_id)
         print('Log lines:')
 
-        lpp = 15  # logs per page
+        lpp = 12  # logs per page
         ln = len(logs.lines)
         term_works = True
         ctr = 0
@@ -294,6 +306,7 @@ class App(Cmd):
                     # Read the card key
                     key = ebcard.get_pubkey()
                     dev.card_id = self.format_pubkey(key)
+                    dev.card_id_short = dev.card_id[:23]
 
                 except errors.InvalidApplet as e:
                     dev.import_applet_ok = False
@@ -309,13 +322,13 @@ class App(Cmd):
 
             for idx, dev in enumerate(devices):
                 if not dev.card_ok:
-                    print('%02d. No card present\n    reader: %s\n' % (idx+1, dev.reader))
+                    print('%02d. No card present\n reader: %s\n' % (idx+1, dev.reader))
                 elif not dev.import_applet_ok:
-                    print('%02d. Unknown card\n    reader: %s\n' % (idx+1, dev.reader))
+                    print('%02d. Unknown card\n reader: %s\n' % (idx+1, dev.reader))
                 elif dev.card_id is None:
-                    print('%02d. Uninitialized card\n    reader: %s\n' % (idx+1, dev.reader))
+                    print('%02d. Uninitialized card\n reader: %s\n' % (idx+1, dev.reader))
                 else:
-                    print('%02d. Import card %s\n    reader: %s\n' % (idx+1, dev.card_id, dev.reader))
+                    print('%02d. Import card %s\n reader: %s\n' % (idx+1, dev.card_id_short, dev.reader))
 
             return self.return_code(0)
 
@@ -347,9 +360,9 @@ class App(Cmd):
 
             # Read the card key
             key = self.card.get_pubkey()
-            key_fmted = self.format_pubkey(key)
+            key_fmted = self.format_pubkey(key)[:23]
 
-            print('\nKey importer version %s. \nGoing to use the card: %s' % (self.version, key_fmted))
+            print('\nKey importer version %s. \nActive card: %s' % (self.version, key_fmted))
             return self.return_code(0)
 
         except Exception as e:
@@ -364,8 +377,8 @@ class App(Cmd):
         if msg.operation in operation_logs:
             op_str = operation_logs[msg.operation]
 
-        print(' - status: %04X, ID: %04X, Len: %04X, Operation: %02X (%s), Share: %d, data: %08X'
-              % (msg.status, msg.id, msg.len, msg.operation, op_str, msg.share_id, msg.data))
+        print('-%04X %s, result: %04X, Share: %d, data: %08X'
+              % (msg.id, op_str, msg.status, msg.share_id, msg.data))
 
     def dump_share(self, idx, share):
         if idx == 3:
@@ -397,13 +410,13 @@ class App(Cmd):
 
         # Last share left
         if share_idx is None and free_shares is not None and len(free_shares) == 1:
-            if not self.ask_proceed('The last share %d is about to set, is that correct? (y/n): ' % free_shares[0]):
+            if not self.ask_proceed('The last share - #%d - will be set, is that correct? (y/n): ' % free_shares[0]):
                 return self.return_code(2), None, 0
             share_idx = free_shares[0]
 
         # Ask for share idx
         if share_idx is None:
-            print('Please, pick the key share index you are going to add:')
+            print('Select key share/part you add:')
             while True:
                 try:
                     share_list = '1/2/3'
@@ -424,7 +437,7 @@ class App(Cmd):
         print('Please, select the key type: ')
         while True:
             try:
-                key_type_idx = self.select(enumerate(key_types), 'Key type ID: ')
+                key_type_idx = self.select(enumerate(key_types), 'Enter key type (1-4): ')
                 break
             except Exception as e:
                 pass
@@ -460,10 +473,10 @@ class App(Cmd):
                               % format_data(toBytes(key_share)))
 
                 if self.hide_key:
-                    print('The following key share will be imported: \n  KCV: %s\n'
+                    print('Please confirm the key share value: \n  KCV: %s\n'
                           % (format_data(kcv[0:3])))
                 else:
-                    print('The following key share will be imported: \n  %s\n  KCV: %s\n'
+                    print('Please confirm the key share value: \n  %s\n  KCV: %s\n'
                           % (format_data(key_share_arr), format_data(kcv[0:3])))
 
                 ok = self.ask_proceed_quit('Is it correct? (y/n/q): ')
@@ -481,12 +494,12 @@ class App(Cmd):
 
         # Get more detailed info on the share - for the audit
         # date, time, name, key ID, key source
-        print('\nNow please enter auxiliary key share information for audit.')
+        print('\nNow please enter key label.')
 
         dt, key_id = None, None
         while True:
             # Date, device does not have a local time
-            dt = self.ask_date(' - Enter date in the format YY/MM/DD: ', ask_correct=False)
+            dt = self.ask_date(' - Enter date as YY/MM/DD: ', ask_correct=False)
 
             # Key ID
             key_id = raw_input(' - Key ID (10 chars max): ').strip()
@@ -503,14 +516,14 @@ class App(Cmd):
 
         print('-'*self.get_term_width())
         print('\nSummary of the key to import:')
-        print(' - Share index: %d' % share_idx)
+        print(' - Share index (key part): %d' % share_idx)
         print(' - Key type: %s' % key_type.name)
         if not self.hide_key:
             print(' - Key: %s' % (format_data(key_share_arr)))
         print(' - KCV: %s' % (format_data(kcv[0:3])))
         print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
-        print(' - Text descriptor: %s' % txt_desc)
+#        print(' - Key Label: %s' % txt_desc)
         print('\n')
 
         ok = self.ask_proceed('Shall the key share be imported? (y/n): ')
