@@ -372,12 +372,14 @@ class KeyBox(object):
                     self._move(y, x+1)
             elif y == self.maxy:
                 pass
-            else:
+            elif not self.auto_format:
+                self._move(y+1, 0)
+            elif self._end_of_line(y) >= self.maxx:
                 self._move(y+1, 0)
         elif ch == curses.ascii.BEL:                           # ^g
             return 0
         elif ch == curses.ascii.NL:                            # ^j
-            if self.maxy == 0:
+            if self.maxy == 0 or self.auto_format:
                 return 0
             elif y < self.maxy:
                 self._move(y+1, 0)
@@ -392,9 +394,8 @@ class KeyBox(object):
             self.win.refresh()
         elif ch in (curses.ascii.SO, curses.KEY_DOWN):         # ^n
             if y < self.maxy:
-                self._move(y+1, x)
-                if x > self._end_of_line(y+1):
-                    self._move(y+1, self._end_of_line(y+1))
+                if not self.auto_format or self._end_of_line(y) >= self.maxx:
+                    self._move(y+1, min(x, self._end_of_line(y+1)))
         elif ch == curses.ascii.SI:                            # ^o
             self.win.insertln()
         elif ch in (curses.ascii.DLE, curses.KEY_UP):          # ^p
