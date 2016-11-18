@@ -142,7 +142,7 @@ class App(Cmd):
         for idx, share in enumerate(shares_start):
             if not share.used and idx != 3:
                 free_shares.append(idx+1)
-#            self.dump_share(idx, share)
+            # self.dump_share(idx, share)
         print('\n')
 
         if len(free_shares) == 0:
@@ -523,7 +523,7 @@ class App(Cmd):
         print(' - KCV: %s' % (format_data(kcv[0:3])))
         print('\n - Date: %d/%d/%d' % (dt[0], dt[1], dt[2]))
         print(' - Key ID: %s' % key_id)
-#        print(' - Key Label: %s' % txt_desc)
+        # print(' - Key Label: %s' % txt_desc)
         print('\n')
 
         ok = self.ask_proceed('Shall the key share be imported? (y/n): ')
