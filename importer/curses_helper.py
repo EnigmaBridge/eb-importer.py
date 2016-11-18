@@ -328,7 +328,7 @@ class KeyBox(object):
                         self._move(backy, backx)
                         self.last_y, self.last_x = y, x
                     else:
-                        logger.warning('Out of bounds: %d %d max %d %d' % (y,x, self.maxy, self.maxx))
+                        logger.warning('Out of bounds: %d %d max %d %d' % (backy, backx, self.maxy, self.maxx))
 
     def do_command(self, ch):
         "Process a single editing command."
