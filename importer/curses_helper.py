@@ -66,9 +66,7 @@ class KeyBox(object):
     def _init_buffer(self):
         self.buffer = []
         for y in range(0, self.maxy+1):
-            self.buffer.append([])
-            for x in range(0, self.maxx+1):
-                self.buffer[y].append(curses.ascii.SP)
+            self.buffer.append([curses.ascii.SP] * (self.maxx+1))
 
     def _end_of_line(self, y):
         """Go to the location of the first blank on the given line,
