@@ -474,13 +474,11 @@ if __name__ == '__main__':
 
         maxy, maxx = win.getmaxyx()
 
-        win_key = curses.newwin(2, 38, 3, 0)
+        win_key = curses.newwin(2, 40, 3, 0)
         maxy, maxx = win_key.getmaxyx()
         pary, parx = win_key.getparyx()
 
-        keybox = KeyBox(win_key, True)
-        keybox.hide_input = True
-        keybox.max_input_len = 36
+        keybox = KeyBox(win_key, True, hide_input=False, max_input_len=38)
         res = keybox.edit().strip()
 
     print('Result: \n%s||\n' % res)
