@@ -457,14 +457,10 @@ if __name__ == '__main__':
         win.refresh()
 
         maxy, maxx = win.getmaxyx()
-        sys.stderr.write('maxy, maxx: %d %d\n' % (maxy, maxx))
 
         win_key = curses.newwin(2, 38, 3, 0)
         maxy, maxx = win_key.getmaxyx()
         pary, parx = win_key.getparyx()
-
-        sys.stderr.write('win maxy, maxx: %d %d\n' % (maxy, maxx))
-        sys.stderr.write('win pary, parx: %d %d\n' % (pary, parx))
 
         keybox = KeyBox(win_key, True)
         keybox.hide_input = False
