@@ -100,21 +100,32 @@ class KeyBox(object):
         # current x as the last position (len)
         cdir = 1
         if cur_y is not None and cur_x is not None:
-            if y == cur_y and cur_x-x == 1:
+            if y == cur_y and cur_x-x == 1 or cur_x-x == 2:
+                cdir = -1
+            elif y == cur_y-1:
                 cdir = -1
 
         # Skipping over the delimiter positions w.r.t. moving direction.
         if cdir > 0:
             # Moving to the right
-            if x > 0 and ((x+1) % (self.auto_format_block_size+1)) == 0:
+            if ((x+1) % (self.auto_format_block_size+1)) == 0:
                 x += 1
         else:
             # moving to the left
-            if x > 0 and ((x+1) % (self.auto_format_block_size+1)) == 0:
+            if ((x+1) % (self.auto_format_block_size+1)) == 0:
                 x -= 1
 
-        y = min(y, self.maxy)
-        x = min(x, self.maxx)
+        # line movements
+        if x > self.maxx and y < self.maxy:
+            x = 0
+            y += 1
+        elif x < 0 and y > 0:
+            x = self._end_of_line(y-1)
+            y -= 1
+        else:
+            y = min(y, self.maxy)
+            x = min(x, self.maxx)
+
         return max(y, 0), max(0, x)
 
     def _add_char(self, y, x, ch):
@@ -173,8 +184,7 @@ class KeyBox(object):
         :param x:
         :return:
         """
-        cur_y, cur_x = self.win.getyx()
-        y, x = self._translate(y, x, cur_y, cur_x)
+        y, x = self._translate(y, x, self.last_y, self.last_x)
         try:
             res = self.win.move(y, x)
             self.last_x = x
@@ -268,12 +278,14 @@ class KeyBox(object):
                     self._insert_printable_char(oldch)
                     if backy <= self.maxy and backx <= self.maxx:
                         self._move(backy, backx)
+                        self.last_y, self.last_x = y, x
                     else:
                         logger.warning('Out of bounds: %d %d max %d %d' % (y,x, self.maxy, self.maxx))
 
     def do_command(self, ch):
         "Process a single editing command."
         (y, x) = self._getyx()
+        self.last_y, self.last_x = y, x
         self.lastcmd = ch
         if curses.ascii.isprint(ch):
 
