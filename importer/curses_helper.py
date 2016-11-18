@@ -388,13 +388,22 @@ class KeyBox(object):
                     self._move(y-1, self._end_of_line(y-1))
         return 1
 
+    def collect_buffer(self):
+        """
+        Collects data in the multiline buffer without line separation.
+        Buffer lines are concatenated.
+        :return:
+        """
+        result = ""
+        for y in range(self.maxy+1):
+            result += ''.join([chr(x) for x in self.buffer[y]])
+        return result
+
     def gather(self):
         """Collect and return the contents of the window."""
         result = ""
         if self.auto_format or self.hide_input:
-            for y in range(self.maxy+1):
-                result += ''.join([chr(x) for x in self.buffer[y]])
-            return result
+            return self.collect_buffer()
 
         for y in range(self.maxy+1):
             self._move(y, 0)
