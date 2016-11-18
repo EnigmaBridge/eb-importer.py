@@ -691,12 +691,23 @@ class App(Cmd):
 
             # Create window just for the key entry.
             # if key length is given - compute number of characters needed.
-            win_width = 78
-            if key_len is not None:
-                win_width = int(2*key_len + math.ceil(2*key_len / 4))
+            data_length = key_len * 2 if key_len is not None else None
+            max_width = self.get_term_width()
 
-            win_key = curses.newwin(1, win_width, 3, min(4, max(0, 80-win_width)))
+            w_offset = 0
+            w_cols = max_width
+            w_rows = 2
+
+            if key_len is not None:
+                w_rows = 1
+                row_needed = math.ceil(data_length/4.0) * 5.0
+                if row_needed > max_width:
+                    w_rows = int(math.ceil(row_needed / float(max_width)))
+
+            win_key = curses.newwin(w_rows, w_cols, 3, w_offset)
             keybox = KeyBox(win_key, True)
+            keybox.auto_format = True
+            keybox.max_input_len = data_length
 
             if not self.hide_key:
                 keybox.hide_input = False
@@ -722,7 +733,7 @@ class App(Cmd):
 
                 # Allow finishing only if entering all characters
                 if ch == curses.ascii.NL and key_type is not None:
-                    tmp_share = (''.join([chr(x) for x in keybox.buffer]))
+                    tmp_share = keybox.collect_buffer()
                     tmp_share = tmp_share.strip().upper().replace(' ', '')
                     try:
                         tmp_share = key_type.process_key(tmp_share)
@@ -744,7 +755,7 @@ class App(Cmd):
 
                 keybox.win.refresh()
 
-            key_share = (''.join([chr(x) for x in keybox.buffer]))
+            key_share = keybox.collect_buffer()
             key_share = key_share.strip().upper().replace(' ', '')
             key_share_fix = key_share
             if key_type is not None:
