@@ -102,14 +102,6 @@ class KeyBox(object):
         for y in range(0, self.maxy+1):
             self.buffer.append([curses.ascii.SP] * (self.maxx+1))
 
-    def _map_coords(self, y=None, x=None, to_buffer=True):
-        """
-        Map absolute coordinates between data buffer and screen.
-        :param to_buffer: if true: screen coords -> buffer coords
-        :return:
-        """
-        pass
-
     def _end_of_line(self, y):
         """Go to the location of the first blank on the given line,
         returning the index of the last non-blank character."""
