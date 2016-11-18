@@ -48,6 +48,7 @@ class KeyBox(object):
         self.placeholder = '*'
         self.auto_format = True
         self.auto_format_block_size = 4
+        self.max_input_len = None
         self.last_x = 0
         self.last_y = 0
         win.keypad(1)
@@ -309,6 +310,13 @@ class KeyBox(object):
 
     def _insert_printable_char(self, ch, from_user=False):
         (y, x) = self._getyx()
+
+        # if max length is set, check if it is already done.
+        if self.auto_format:
+            num_chars = self._num_characters_in_autoformat(y=y, x=x)
+            if self.max_input_len is not None and self.max_input_len <= num_chars:
+                return
+
         if y < self.maxy or x < self.maxx:
             if self.insert_mode:
                 oldch = self._inch(y, x)
@@ -330,13 +338,24 @@ class KeyBox(object):
                     else:
                         logger.warning('Out of bounds: %d %d max %d %d' % (backy, backx, self.maxy, self.maxx))
 
+    def _num_characters_in_autoformat(self, y, x):
+        """
+        Estimates number of entered characters if autoformat is enabled from the given coordinates.
+        :param y:
+        :param x:
+        :return:
+        """
+        w = self.auto_format_block_size
+        res = int(y*((self.maxx+1)/(w+1) * w))  # all previous lines filled with data
+        res += x - math.floor(x / (w+1))  # on the current line
+        return int(res)
+
     def do_command(self, ch):
         "Process a single editing command."
         (y, x) = self._getyx()
         self.last_y, self.last_x = y, x
         self.lastcmd = ch
         if curses.ascii.isprint(ch):
-
             # Ignore white spaces in auto-formatting mode
             if self.auto_format and ch == curses.ascii.SP:
                 return 1
