@@ -247,11 +247,12 @@ class KeyBox(object):
         :param x:
         :return:
         """
-        cur_y, cur_x = self.win.getyx()
-        cur_x += 2
-
         x -= 1
-        y, x = self._translate(y, x, cur_y, cur_x)
+        if x < 0 and y > 0:
+            x = self.maxx
+            y -= 1
+
+        y, x = self._translate(y, x, self.last_y, self.last_x+2)
 
         # update buffer
         self.buffer[y] = self.buffer[y][0:x] + self.buffer[y][x+1:] + [curses.ascii.SP]
