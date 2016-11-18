@@ -389,6 +389,11 @@ class KeyBox(object):
     def gather(self):
         """Collect and return the contents of the window."""
         result = ""
+        if self.auto_format or self.hide_input:
+            for y in range(self.maxy+1):
+                result += ''.join([chr(x) for x in self.buffer[y]])
+            return result
+
         for y in range(self.maxy+1):
             self._move(y, 0)
             stop = self._end_of_line(y)
