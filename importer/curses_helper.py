@@ -100,11 +100,6 @@ class KeyBox(object):
         for y in range(0, self.maxy+1):
             self.buffer.append([curses.ascii.SP] * (self.maxx+1))
 
-        max_len = self.max_input_len
-        if max_len is None:
-            max_len = (self.maxy+1) * self.maxx
-        self.input_data = [curses.ascii.SP] * max_len
-
     def _map_coords(self, y=None, x=None, to_buffer=True):
         """
         Map absolute coordinates between data buffer and screen.
@@ -239,6 +234,20 @@ class KeyBox(object):
             logger.error('Error move %d %d %s' % (y, x, e))
             return None
 
+    def _del_printable_char(self, y, x):
+        if y >= self.maxy and x >= self.maxx-1:
+            self._add_char(y, x, curses.ascii.SP)
+            return
+
+        if y >= self.maxy and x >= self.maxx:
+            return
+
+        newch = self._inch(y, x+1)
+        self._add_char(y, x, newch)
+
+        next_y, next_x = self._translate(y, x+1, y, x)
+        self._del_printable_char(next_y, next_x)
+
     def _delch(self, y, x):
         """
         Deleting a character at given position.
@@ -255,58 +264,11 @@ class KeyBox(object):
 
         y, x = self._translate(y, x, self.last_y, self.last_x+2)
 
-        # update buffer
-        self.buffer[y] = self.buffer[y][0:x] + self.buffer[y][x+1:] + [curses.ascii.SP]
+        # Recursive character deletion
+        self._del_printable_char(y, x)
 
-        # delete the character
-        self.win.delch(y, x)
-
-        if not self.auto_format:
-            return
-
-        # Fix buffer spaces re-alignment, move space to 1 to the right
-        # Buffer contains input string also with spaces.
-        self._move_delim(y, x)
-
-        # Raw repainting from the buffer
-        # Buffer contains spaces also, thus can be rerendered without coordinate remapping
+        # Move to the correct position after delete
         self.win.move(y, x)
-        self._redraw_buff(y, x)
-        self.win.move(y, x)
-        pass
-
-    def _move_delim(self, y, x, to_right=True):
-        # Fix buffer spaces re-alignment, move space to 1 to the right
-        # Buffer contains input string also with spaces.
-        ln = len(self.buffer[y])
-        i = x
-
-        loop_end = ln-1
-        if not to_right:
-            i += 1
-            loop_end = ln
-
-        while i < loop_end:
-            c = self.buffer[y][i]
-            if c == curses.ascii.SP:
-                n = self.buffer[y][i+1 if to_right else i-1]
-                self.buffer[y][i] = n
-                self.buffer[y][i+1 if to_right else i-1] = c
-                if to_right:
-                    i += 1
-            i += 1
-        pass
-
-    def _redraw_buff(self, y, x=0):
-        ln = len(self.buffer[y])
-        for i in range(x, ln):
-            c = self.buffer[y][i]
-            if self.hide_input and c != curses.ascii.SP:
-                c = self.placeholder
-            try:
-                self.win.addch(c)
-            except:
-                pass
 
     def _insert_printable_char(self, ch, from_user=False):
         (y, x) = self._getyx()
