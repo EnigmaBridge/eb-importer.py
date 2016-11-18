@@ -468,7 +468,10 @@ if __name__ == '__main__':
         pary, parx = win_key.getparyx()
 
         keybox = KeyBox(win_key, True)
-        keybox.hide_input = False
-        keybox.edit()
+        keybox.hide_input = True
+        keybox.max_input_len = 36
+        res = keybox.edit().strip()
+
+    print('Result: \n%s||\n' % res)
 
 
