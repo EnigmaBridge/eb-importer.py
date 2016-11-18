@@ -84,16 +84,16 @@ class KeyBox(object):
         # the line + space
         if self.auto_format:
             w = self.auto_format_block_size + 1
-            new_maxx = self.maxx - (self.maxx % w)
+            new_maxx = self.maxx - ((self.maxx+1) % w)
 
             # if new dimension is too small to fit data in - log an warning
-            data_on_line = (new_maxx/w) * self.auto_format_block_size
+            data_on_line = ((new_maxx+1)/w) * self.auto_format_block_size
             if self.max_input_len is not None and data_on_line * (self.maxy+1) < self.max_input_len:
                 logger.warning('Not enough space for %d characters' % self.max_input_len)
 
             else:
-                self.win.resize(self.maxy+1, new_maxx)
-                self.maxx = new_maxx - 1
+                self.win.resize(self.maxy+1, new_maxx+1)
+                self.maxx = new_maxx
 
         self._init_buffer()
 
