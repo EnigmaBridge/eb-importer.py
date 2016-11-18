@@ -302,7 +302,10 @@ class KeyBox(object):
             c = self.buffer[y][i]
             if self.hide_input and c != curses.ascii.SP:
                 c = self.placeholder
-            self.win.addch(c)
+            try:
+                self.win.addch(c)
+            except:
+                pass
 
     def _insert_printable_char(self, ch, from_user=False):
         (y, x) = self._getyx()
