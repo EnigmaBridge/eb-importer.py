@@ -2,6 +2,7 @@ from __future__ import division, print_function
 import curses
 import curses.ascii
 import logging
+import math
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class KeyBox(object):
         self.last_x = 0
         self.last_y = 0
         win.keypad(1)
-        self._init_buffer()
+        self._init_state()
 
     def goto_last(self):
         """
@@ -63,10 +64,53 @@ class KeyBox(object):
         except:
             pass
 
+    def reinit(self):
+        """
+        Reinitializes key box dimensions
+        :return:
+        """
+        self.last_x = 0
+        self.last_y = 0
+        (self.maxy, self.maxx) = win.getmaxyx()
+        self.maxy = self.maxy - 1
+        self.maxx = self.maxx - 1
+        self._init_state()
+
+    def _init_state(self):
+        # in case of auto-format adapt the size of the window so the complete tuple is on
+        # the line + space
+        if self.auto_format:
+            w = self.auto_format_block_size + 1
+            new_maxx = self.maxx - (self.maxx % w)
+
+            # if new dimension is too small to fit data in - log an warning
+            data_on_line = (new_maxx/w) * self.auto_format_block_size
+            if self.max_input_len is not None and data_on_line * (self.maxy+1) < self.max_input_len:
+                logger.warning('Not enough space for %d characters' % self.max_input_len)
+
+            else:
+                self.win.resize(self.maxy+1, new_maxx)
+                self.maxx = new_maxx - 1
+
+        self._init_buffer()
+
     def _init_buffer(self):
         self.buffer = []
         for y in range(0, self.maxy+1):
             self.buffer.append([curses.ascii.SP] * (self.maxx+1))
+
+        max_len = self.max_input_len
+        if max_len is None:
+            max_len = (self.maxy+1) * self.maxx
+        self.input_data = [curses.ascii.SP] * max_len
+
+    def _map_coords(self, y=None, x=None, to_buffer=True):
+        """
+        Map absolute coordinates between data buffer and screen.
+        :param to_buffer: if true: screen coords -> buffer coords
+        :return:
+        """
+        pass
 
     def _end_of_line(self, y):
         """Go to the location of the first blank on the given line,
